@@ -1,0 +1,218 @@
+import serial
+import time
+import datetime
+from pathlib import Path
+import csv
+from loader import Loader
+from plotwindow import PlotWindow
+
+
+class Keithley:
+    """
+    Handles serial communication with and initialization of the Keithley2700 multimeter
+    """
+    preamble = ["*RST\n",
+                "SYST:PRES\n",
+                "SYST:BEEP OFF\n",
+                "TRAC:CLE\n",
+                "TRAC:CLE:AUTO OFF\n",
+                "INIT:CONT OFF\n",
+                "TRIG:COUN 1\n",
+                "FORM:ELEM READ\n"]
+
+    def __init__(self, port='COM0', timeout=15, quiet=True):
+        self.port = port
+        self.timeout = timeout
+        self.quiet = quiet
+
+    def __enter__(self):
+        self.serial = serial.Serial(self.port, timeout=self.timeout)
+        print(f'Connected to device at {self.port}')
+        for command in self.preamble:
+            self.write(command)
+            time.sleep(0.5)
+        self.serial.flushInput()
+        print(f'Keithley initialized')
+        return self
+
+    def __exit__(self, *exc_info):
+        try:
+            close_it = self.serial.close
+            print('Closing serial connection with Keithley')
+        except AttributeError:
+            # TODO check what this might be catching?
+            pass
+        else:
+            close_it()
+            print(f'Closed connect at {self.port}')
+
+    def write(self, command):
+        # Write a single string or a list of strings to the device
+        if isinstance(command, str):
+            if not self.quiet:
+                print('writing: ' + command.strip("\n"))
+            self.serial.write(command.encode())
+        elif isinstance(command, list):
+            for cmd in command:
+                self.write(cmd)
+        else:
+            raise TypeError('invalid command or command list')
+
+    def read(self):
+        # Read data from Keithley and return list of floats representing recorded values
+        self.write("READ?\n")
+        data = self.serial.read_until(b"\r").decode().split(',')
+        data = list(map(float, data))
+        return data
+
+    def init_measurement(self, channels):
+        for idx, chan in enumerate(channels):
+            chan.chan_idx = idx
+            self.write(chan.init_cmds)
+            print(f'Initialized logical channel {chan.chan_idx:d}: {chan.chan_name} '
+                  f'at Keithley port ({chan.hard_port:d})')
+        chan_list_str = '(@' + ','.join([str(chan.hard_port) for chan in channels]) + ')'
+        self.write("ROUT:SCAN " + chan_list_str + "\n")
+        # The order of the hardware channel listing in chan_list_str in the "ROUT:SCAN..." command determines
+        # the order in which the Keithley will read out its data. This ordering derives from the order of channels
+        # in channels. Here we memoize that order into a logical channel identification for each channel.
+        # This identification is used to correctly assign data output from the Keithley to the appropriate channel.
+
+        self.write(f"SAMP:COUN {len(channels)}\n")
+        self.write("ROUT:SCAN:LSEL INT\n")
+
+    def get_data(self, save_groups):
+        channels = [chan for save_group in save_groups for chan in save_group.channels]
+        curr_time = datetime.datetime.now()
+        date_time_string = curr_time.strftime('%Y-%m-%d %H:%M:%S')
+        data = self.read()
+        try:
+            if not self.quiet:
+                print(date_time_string + " raw data: " + ", ".join([f"{datum:.3f}" for datum in data]))
+        except ValueError:
+            if data == ["b''"]:
+                print(date_time_string + ": Error: Received nothing from Keithley")
+            else:
+                print(date_time_string + f": Error: Received {data} from Keithley")
+        for chan in channels:
+            chan.curr_data = chan.conv_func(data[chan.chan_idx])  # Consider saving raw data instead of converted data
+        for save_group in save_groups:
+            save_group.save_data(curr_time)
+
+    @staticmethod
+    def volt_cmds(chan_num):
+        return ["SENS:FUNC 'VOLT',(@" + str(chan_num) + ")\n",
+                "SENS:VOLT:NPLC 5,(@" + str(chan_num) + ")\n",
+                "SENS:VOLT:RANG 5,(@" + str(chan_num) + ")\n"]
+
+    @staticmethod
+    def rtd_cmds(chan_num):
+        return ["SENS:FUNC 'TEMP',(@" + str(chan_num) + ")\n",
+                "SENS:TEMP:TRAN FRTD,(@" + str(chan_num) + ")\n",
+                "SENS:TEMP:FRTD:TYPE PT100,(@" + str(chan_num) + ")\n",
+                "SENS:TEMP:NPLC 5,(@" + str(chan_num) + ")\n"]
+
+    @staticmethod
+    def thcpl_cmds(chan_num):
+        return ["SENS:FUNC 'TEMP',(@" + str(chan_num) + ")\n",
+                "SENS:TEMP:TRAN TC,(@" + str(chan_num) + ")\n",
+                "SENS:TEMP:TC:TYPE K,(@" + str(chan_num) + ")\n",
+                # "SENS:TEMP:TC:RJUN:RSEL INT,(@" + str(chan_num) + ")\n",
+                "SENS:TEMP:TC:RJUN:RSEL SIM,(@" + str(chan_num) + ")\n",
+                "SENS:TEMP:TC:RJUN:SIM 23,(@" + str(chan_num) + ")\n",
+                "SENS:TEMP:NPLC 5,(@" + str(chan_num) + ")\n"]
+
+
+class Channel:
+    """
+    Single data channel
+    """
+    def __init__(self, hard_port=101, chan_idx=0, chan_name="Voltage",
+                 conv_func=lambda x: x, init_cmds_template=Keithley.volt_cmds):
+        self.hard_port = hard_port
+        self.chan_idx = chan_idx  # chan_idx will be configured by the controller upon initialization
+        self.chan_name = chan_name
+        self.conv_func = conv_func
+        self.init_cmds = init_cmds_template(hard_port)
+        self.curr_data = 0
+
+
+class SaveGroup:
+    """
+    Collection of channels whose data will be saved in a common file.
+    """
+    def __init__(self, channels, group_name='DataGroup',
+                 log_drive=None, backup_drive=None, error_drive=None, webplot_drive=None,
+                 date_format='%Y-%m-%d', time_format='%H:%M:%S', data_label='Signal Level', quiet=True):
+        if not isinstance(channels, list):
+            channels = [channels]
+        self.channels = channels
+        self.group_name = group_name
+        self.log_drive = log_drive
+        self.backup_drive = backup_drive
+        self.error_drive = error_drive
+        self.webplot_drive = webplot_drive
+        self.date_format = date_format
+        self.time_format = time_format
+        self.loader = Loader(log_drive, group_name, date_format, time_format)
+        self.data_label = data_label
+        self.plotwindow = PlotWindow(self.loader, ylabel=self.data_label)
+        self.quiet = quiet
+
+    def save_data(self, time_stamp):
+        data = dict()
+        data['date'] = time_stamp.strftime(self.date_format)
+        data['time'] = time_stamp.strftime(self.time_format)
+        for chan in self.channels:
+            data[chan.chan_name] = f'{chan.curr_data:f}'
+
+        # Legacy format for saving the data. Would make sense to save datetime string in one cell.
+
+        file_name = f'{self.group_name} {data["date"]}.csv'
+        file_path = Path(self.log_drive, file_name)
+
+        # Attempt to write data to log_drive. Write to error_drive in event of failure.
+        try:
+            write_to_csv(file_path, data, quiet=self.quiet)
+        except OSError:
+            print(f'Warning, OSError while attempting to write data to log file: {file_path}')
+            error_file_name = f'Error - {self.group_name} {data["date"]}.csv'
+            error_file_path = Path(self.error_drive, error_file_name)
+            try:
+                write_to_csv(error_file_path, data, quiet=self.quiet)
+            except OSError:
+                print(f'Warning, OSError while attempting to write data to error log: {error_file_path}')
+
+        backup_file_name = f'{self.group_name} {data["date"]}.csv'
+        backup_file_path = Path(self.backup_drive, backup_file_name)
+        try:
+            write_to_csv(backup_file_path, data, quiet=self.quiet)
+        except OSError:
+            print(f'Warning, OSError while attempting to write to backup log: {backup_file_path}')
+            # print('Ok, even backup log directory is having trouble. Shit has gone to hell! Abandon ship!')
+
+
+def write_to_csv(file_path, data_dict, quiet=True):
+    keys = data_dict.keys()
+    file_exists = Path.is_file(file_path)
+    if file_exists:
+        fieldnames = get_csv_header(file_path)
+        if set(fieldnames) != set(keys):
+            raise ValueError(f'keys {keys} in data input do not match header {fieldnames} for {file_path}')
+    else:
+        fieldnames = keys
+
+    with open(file_path, 'a', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow(data_dict)
+        if not quiet:
+            print(f'wrote {data_dict} to {file_path}')
+
+
+def get_csv_header(file_path):
+    with open(file_path, 'r', newline='') as file:
+        reader = csv.reader(file)
+        header = next(reader)
+    return header
