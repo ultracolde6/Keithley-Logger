@@ -2,6 +2,7 @@ import kmm_data_handler as kl
 import numpy as np
 import datetime
 import time
+from pathlib import Path
 
 
 class FakeDataSource:
@@ -13,20 +14,19 @@ class FakeDataSource:
         t = datetime.datetime.now() - self.t0
         data_list = [f(t) for f in self.data_funcs]
         return data_list
-    
-log_drive = 'Y:/DataRaid E6/Data/KeithleyLogger/'
-backup_drive = 'C:/KeithleyLoggerBackup/'
-error_drive = 'C:/KeithleyLoggerBackup/Error/'
-webplot_drive = '//oxford.physics.berkeley.edu/web/internal/e6/'
 
+keithley_logger_temp_path = Path('C:/', 'Users', 'Justin', 'Desktop', 'Working', 'Keithley Logger Work')
+log_drive = Path(keithley_logger_temp_path, 'Log Drive')
+backup_drive = Path(keithley_logger_temp_path, 'Backup Drive')
+error_drive = Path(keithley_logger_temp_path, 'Error Drive')
+webplot_drive = Path(keithley_logger_temp_path, 'Webplot Drive')
 fake_data = kl.Channel(hard_port=101, chan_name='fake data')
 fake_data_group = kl.SaveGroup([fake_data],
                                group_name='Fake Data', quiet=True,
-                               log_drive=log_drive + 'Fake Data/',
-                               backup_drive=backup_drive + 'Fake Data/',
+                               log_drive=Path(log_drive, 'Fake Data/'),
+                               backup_drive=Path(backup_drive, 'Fake Data/'),
                                error_drive=error_drive,
                                webplot_drive=webplot_drive)
-
 
 def add_outlier():
     if np.random.rand() < 0.1:

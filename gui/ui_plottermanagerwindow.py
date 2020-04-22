@@ -67,8 +67,9 @@ class PlotterManagerWindow(QtWidgets.QMainWindow):
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
-    log_drive = Path('Y:/', 'E6', 'DataRaid E6', 'Data', 'KeithleyLogger', 'IonGauge')
-    file_prefix = 'IonGauge'
+    keithley_logger_temp_path = Path('C:/', 'Users', 'Justin', 'Desktop', 'Working', 'Keithley Logger Work')
+    log_drive = Path(keithley_logger_temp_path, 'Log Drive', 'Fake Data')
+    file_prefix = 'Fake Data'
     iongauge_data_loader = Loader(log_drive, file_prefix, quiet=True)
     plotter = PlotWindow(iongauge_data_loader)
     ui = PlotterManagerWindow([plotter])
