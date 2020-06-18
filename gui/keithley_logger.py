@@ -5,6 +5,7 @@ from pathlib import Path
 import csv
 from gui.loader import Loader
 from PyQt5 import QtCore
+from PyQt5.QtSerialPort import QSerialPort
 
 
 class Logger(QtCore.QObject):
@@ -52,6 +53,7 @@ class Keithley:
         self.log_freq = log_freq
         self.timeout = timeout
         self.quiet = quiet
+        self.serial = QSerialPort()
 
     def __enter__(self):
         self.serial = serial.Serial(self.port, timeout=self.timeout)

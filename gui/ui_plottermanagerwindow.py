@@ -54,9 +54,6 @@ class PlotterManagerWindow(QtWidgets.QMainWindow):
         self.setWindowTitle(_translate("PlotterManagerWindow", "MainWindow"))
 
     def checkbox_changed(self, plotter_num):
-        print(plotter_num)
-        print(self.checkboxes[plotter_num])
-        print(self.plotters[plotter_num])
         if self.checkboxes[plotter_num].isChecked():
             self.plotters[plotter_num].show()
         else:
@@ -67,7 +64,7 @@ class PlotterManagerWindow(QtWidgets.QMainWindow):
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
-    keithley_logger_temp_path = Path('C:/', 'Users', 'Justin', 'Desktop', 'Working', 'Keithley Logger Work')
+    keithley_logger_temp_path = Path('C:/', 'Users', 'Justin', 'Desktop', 'Working', 'Code', 'Keithley Logger Work')
     log_drive = Path(keithley_logger_temp_path, 'Log Drive', 'Fake Data')
     file_prefix = 'Fake Data'
     iongauge_data_loader = Loader(log_drive, file_prefix, quiet=True)

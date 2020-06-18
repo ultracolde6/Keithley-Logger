@@ -1,0 +1,437 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>PlotWindow</class>
+ <widget class="QMainWindow" name="PlotWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>606</width>
+    <height>633</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QGridLayout" name="gridLayout">
+    <item row="0" column="0">
+     <layout class="QVBoxLayout" name="yscale_options_verticalLayout">
+      <item>
+       <spacer name="verticalSpacer">
+        <property name="orientation">
+         <enum>Qt::Vertical</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>20</width>
+          <height>40</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="autoscale_checkBox">
+        <property name="text">
+         <string>Autoscale</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QFormLayout" name="ylim_formLayout">
+        <item row="0" column="0">
+         <widget class="QLabel" name="ymax_label">
+          <property name="text">
+           <string>Ymax:</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QLineEdit" name="ymax_lineEdit">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>50</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>1.0</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="ymin_label">
+          <property name="text">
+           <string>Ymin:</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="QLineEdit" name="ymin_lineEdit">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>50</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>0.0</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="outlier_checkBox">
+        <property name="text">
+         <string>Outlier Reject</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QFormLayout" name="outlier_formLayout">
+        <item row="0" column="0">
+         <widget class="QLabel" name="outlier_reject_label">
+          <property name="text">
+           <string>Outlier Reject Level:</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QLineEdit" name="outlier_reject_level_lineEdit">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>50</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>2.0</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="log_radioButton">
+        <property name="text">
+         <string>Logarithmic</string>
+        </property>
+        <property name="checked">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="lin_radioButton">
+        <property name="text">
+         <string>Linear</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="verticalSpacer_2">
+        <property name="orientation">
+         <enum>Qt::Vertical</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>20</width>
+          <height>40</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+     </layout>
+    </item>
+    <item row="1" column="0">
+     <layout class="QVBoxLayout" name="plot_refresh_verticalLayout">
+      <item>
+       <widget class="QPushButton" name="pause_pushButton">
+        <property name="text">
+         <string>Pause</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="update_pushButton">
+        <property name="text">
+         <string>Update Data</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="settings_pushButton">
+        <property name="text">
+         <string>Update Settings</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QFormLayout" name="refresh_formLayout">
+        <item row="0" column="1">
+         <widget class="QLineEdit" name="refresh_lineEdit">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>50</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>30.000</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="0">
+         <widget class="QLabel" name="refresh_label">
+          <property name="text">
+           <string>Refresh Time (s):</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </item>
+    <item row="1" column="1">
+     <widget class="QTabWidget" name="xscale_tabWidget">
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <widget class="QWidget" name="history_tab">
+       <attribute name="title">
+        <string>History Mode</string>
+       </attribute>
+       <layout class="QHBoxLayout" name="horizontalLayout">
+        <item>
+         <spacer name="horizontalSpacer">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <layout class="QVBoxLayout" name="history_verticalLayout">
+          <item>
+           <layout class="QVBoxLayout" name="history_stopdate_verticalLayout">
+            <item alignment="Qt::AlignHCenter">
+             <widget class="QLabel" name="history_stopdate_label">
+              <property name="text">
+               <string>Stop DateTime (yy/mm/dd hh:mm:ss) or &quot;now&quot;</string>
+              </property>
+             </widget>
+            </item>
+            <item alignment="Qt::AlignHCenter">
+             <widget class="QLineEdit" name="history_stopdate_lineEdit">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="text">
+               <string>now</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="history_horizontalLayout">
+            <item>
+             <layout class="QFormLayout" name="days_formLayout">
+              <item row="0" column="0">
+               <widget class="QLabel" name="days_label">
+                <property name="text">
+                 <string>Days:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QLineEdit" name="days_lineEdit">
+                <property name="maximumSize">
+                 <size>
+                  <width>50</width>
+                  <height>16777215</height>
+                 </size>
+                </property>
+                <property name="text">
+                 <string>1</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QFormLayout" name="hours_formLayout">
+              <item row="0" column="1">
+               <widget class="QLineEdit" name="hours_lineEdit">
+                <property name="maximumSize">
+                 <size>
+                  <width>50</width>
+                  <height>16777215</height>
+                 </size>
+                </property>
+                <property name="text">
+                 <string>0</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="0">
+               <widget class="QLabel" name="hours_label">
+                <property name="text">
+                 <string>Hours:</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QFormLayout" name="minutes_formLayout">
+              <item row="0" column="0">
+               <widget class="QLabel" name="minutes_label">
+                <property name="text">
+                 <string>Minutes:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QLineEdit" name="minutes_lineEdit">
+                <property name="maximumSize">
+                 <size>
+                  <width>50</width>
+                  <height>16777215</height>
+                 </size>
+                </property>
+                <property name="text">
+                 <string>0</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <spacer name="horizontalSpacer_2">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="range_tab">
+       <attribute name="title">
+        <string>Range Mode</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_6">
+        <item alignment="Qt::AlignHCenter">
+         <widget class="QLabel" name="range_startdate_label">
+          <property name="text">
+           <string>Start Time (yy/mm/dd hh:mm:ss)</string>
+          </property>
+         </widget>
+        </item>
+        <item alignment="Qt::AlignHCenter">
+         <widget class="QLineEdit" name="range_startdate_lineEdit"/>
+        </item>
+        <item alignment="Qt::AlignHCenter">
+         <widget class="QLabel" name="range_stopdate_label">
+          <property name="text">
+           <string>Stop Time (yy/mm/dd hh:mm:ss) or &quot;now&quot;</string>
+          </property>
+         </widget>
+        </item>
+        <item alignment="Qt::AlignHCenter">
+         <widget class="QLineEdit" name="range_stopdate_lineEdit"/>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+    <item row="0" column="1">
+     <widget class="PlotWidget" name="plotwidget" native="true">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+        <horstretch>1</horstretch>
+        <verstretch>1</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>400</width>
+        <height>400</height>
+       </size>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>606</width>
+     <height>26</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>PlotWidget</class>
+   <extends>QWidget</extends>
+   <header>plotwidget</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

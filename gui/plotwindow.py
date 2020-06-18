@@ -31,7 +31,8 @@ class SinglePlot:
         plot_data = self.plot_window.data[self.chan_labels]
         self.ax.clear()
         if self.plot_window.outlier_reject:
-            time_mask = np.logical_and(self.plot_window.start_datetime < plot_data.index, plot_data.index < self.plot_window.stop_datetime)
+            time_mask = np.logical_and(self.plot_window.start_datetime < plot_data.index,
+                                       plot_data.index < self.plot_window.stop_datetime)
             clipped_data = plot_data[time_mask]
             clipped_data_std = np.std(clipped_data)
             clipped_data_mean = np.mean(clipped_data)
@@ -86,15 +87,15 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
 
         self.data = pd.DataFrame()
         self.paused = False
-        self.pause_button.clicked.connect(self.pause_resume_clicked)
-        self.settings_button.clicked.connect(self.update_settings)
+        self.pause_pushButton.clicked.connect(self.pause_resume_clicked)
+        self.settings_pushButton.clicked.connect(self.update_settings)
         self.tracking = True
         self.updating = False
         self.refresh_timer = QtCore.QTimer(self)
         self.refresh_timer.timeout.connect(self.attempt_update)
         self.worker = PlotWorker(self)
         self.update_signal.connect(self.worker.worker_update)
-        self.update_button.clicked.connect(self.attempt_update)
+        self.update_pushButton.clicked.connect(self.attempt_update)
 
         self.update_settings()
         self.attempt_update()
@@ -228,14 +229,14 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
     def turn_on_tracking(self):
         if not self.tracking:
             self.resume()
-            self.pause_button.setEnabled(True)
+            self.pause_pushButton.setEnabled(True)
             self.tracking = True
 
     def turn_off_tracking(self):
         if self.tracking:
             self.pause()
-            self.pause_button.setEnabled(False)
-            self.pause_button.setText('Tracking Disabled')
+            self.pause_pushButton.setEnabled(False)
+            self.pause_pushButton.setText('Tracking Disabled')
             self.tracking = False
 
     def pause_resume_clicked(self):
@@ -248,13 +249,13 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         print('attempting to stop')
         self.refresh_timer.stop()
         print('stopped?')
-        self.pause_button.setText('Resume')
+        self.pause_pushButton.setText('Resume')
         self.paused = True
 
     def resume(self):
         self.refresh_timer.start(self.refresh_time)
         self.paused = False
-        self.pause_button.setText('Pause')
+        self.pause_pushButton.setText('Pause')
 
 
 class MagPlotWindow(PlotWindow):
