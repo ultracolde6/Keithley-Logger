@@ -1,23 +1,9 @@
 import datetime
 from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot
+from PyQt5.QtCore import QThread, pyqtSignal
 from ui_plotwindow import Ui_PlotWindow
 import pandas as pd
 import numpy as np
-
-
-class PlotWorker(QtCore.QObject):
-    def __init__(self, plotwindow):
-        super(PlotWorker, self).__init__()
-        self.plotwindow = plotwindow
-        self.work_thread = QThread()
-        self.work_thread.start()
-        self.moveToThread(self.work_thread)
-
-    def worker_update(self):
-        self.plotwindow.updating = True
-        self.plotwindow.update()
-        self.plotwindow.updating = False
 
 
 class PlotObject(QtCore.QObject):
@@ -30,19 +16,25 @@ class PlotObject(QtCore.QObject):
 
         self.canvas = self.plot_window.canvas
         self.figure = self.plot_window.figure
-        self.axes = self.configure_axes()
+        self.axes = None
+        self.configure_axes()
 
         self.plot_thread = QThread()
         self.plot_thread.start()
         self.moveToThread(self.plot_thread)
 
     def configure_axes(self):
+        self.figure.clear()
         axes = []
+        if self.plot_window.single_plot_radioButton.isChecked():
+            self.mode = 'singleplot'
+        elif self.plot_window.multi_plot_radioButton.isChecked():
+            self.mode = 'multiplot'
         if self.mode == 'singleplot':
             axes = self.configure_singleplot_axes()
         elif self.mode == 'multiplot':
             axes = self.configure_multiplot_axes()
-        return axes
+        self.axes = axes
 
     def configure_multiplot_axes(self):
         ax = self.figure.add_subplot(self.n_data_fields, 1, 1)
@@ -84,9 +76,6 @@ class PlotObject(QtCore.QObject):
             except TypeError:
                 print('No Data to plot')
             self.axis_scalings()
-            # box = ax.get_position()
-            # ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-            # ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
             self.canvas.draw()
 
     def clip_data(self, data):
@@ -131,6 +120,7 @@ class PlotObject(QtCore.QObject):
 
 class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
     update_signal = pyqtSignal()
+    reconfigure_plot_signal = pyqtSignal()
 
     def __init__(self, loader, ylabel='Signal Level'):
         super(PlotWindow, self).__init__()
@@ -139,8 +129,6 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
 
         self.canvas = self.plotwidget.canvas
         self.figure = self.canvas.figure
-        # self.ax = None
-        # self.set_axes()
         self.ylabel = ylabel
         self.plot_object = PlotObject(self)
 
@@ -157,6 +145,7 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.history_minutes = None
         self.history_delta = None
         self.outlier_reject_level = 2
+        self.plot_mode = None
 
         self.data = pd.DataFrame()
         self.paused = False
@@ -166,27 +155,22 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.updating = False
         self.refresh_timer = QtCore.QTimer(self)
         self.refresh_timer.timeout.connect(self.update)
-        self.worker = PlotWorker(self)
         self.update_signal.connect(self.plot_object.plot)
         self.update_pushButton.clicked.connect(self.update)
+        self.reconfigure_plot_signal.connect(self.plot_object.configure_axes)
 
         self.update_settings()
         self.update()
         self.show()
         self.refresh_timer.start(self.refresh_time)
 
-    # def attempt_update(self):
-    #     """
-    #     The PlotWindow thread initiates the update process by first checking
-    #     if the update process is already occurring. If so it aborts, otherwise it continues.
-    #     The mechanism avoids generating a backlog of update requests in the plotting thread
-    #     if there are delays in that thread.
-    #     """
-    #
-    #     else:
-    #         self.update()
-
     def update(self):
+        """
+        The PlotWindow thread initiates the update process by first checking
+        if the update process is already occurring. If so it aborts, otherwise it continues.
+        The mechanism avoids generating a backlog of update requests in the plotting thread
+        if there are delays in that thread.
+        """
         if self.updating:
             curr_time = datetime.datetime.now()
             time_str = curr_time.strftime('%H:%M:%S')
@@ -199,6 +183,19 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         else:
             self.data = self.loader.grab_dates(self.start_datetime.date(), self.stop_datetime.date())
         self.update_signal.emit()
+
+    def update_settings(self):
+        self.update_yaxis_settings()
+        self.update_refresh_settings()
+        if self.xscale_tabWidget.currentIndex() == 0:
+            self.set_xrange_history_mode()
+        else:
+            self.turn_off_tracking()
+            self.set_xrange_range_mode()
+
+
+        self.reconfigure_plot_signal.emit()
+        self.update()
 
     def update_yaxis_settings(self):
         self.autoscale = self.autoscale_checkBox.isChecked()
@@ -264,16 +261,6 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         except ValueError:
             print('invalid input for start or stop date, input must be formatted as YY/MM/DD HH:MM:SS')
 
-    def update_settings(self):
-        self.update_yaxis_settings()
-        self.update_refresh_settings()
-        if self.xscale_tabWidget.currentIndex() == 0:
-            self.set_xrange_history_mode()
-        else:
-            self.turn_off_tracking()
-            self.set_xrange_range_mode()
-        self.update()
-
     def turn_on_tracking(self):
         if not self.tracking:
             self.resume()
@@ -294,16 +281,14 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
             self.resume()
 
     def pause(self):
-        print('attempting to stop')
         self.refresh_timer.stop()
-        print('stopped?')
         self.pause_pushButton.setText('Resume')
         self.paused = True
 
     def resume(self):
         self.refresh_timer.start(self.refresh_time)
-        self.paused = False
         self.pause_pushButton.setText('Pause')
+        self.paused = False
 
 
 # class MagPlotWindow(PlotWindow):

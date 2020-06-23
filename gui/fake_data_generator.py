@@ -82,4 +82,4 @@ def generate_fake_data():
 if __name__ == "__main__":
     while True:
         generate_fake_data()
-        time.sleep(1)
+        time.sleep(3)

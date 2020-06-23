@@ -116,7 +116,7 @@ class Loader:
                 # Load in new data. Note that lines up until line number self.lines_loaded are skipped
                 new_data = pd.read_csv(file_path,
                                        header=0,
-                                       skiprows=range(1, self.lines_loaded),
+                                       skiprows=range(1, self.lines_loaded + 1),
                                        parse_dates={'datetime': ['date', 'time']},
                                        # parse_dates={'datetime': [0, 1]},
                                        index_col='datetime',
