@@ -7,12 +7,12 @@ import numpy as np
 
 
 class PlotObject(QtCore.QObject):
-    def __init__(self, plot_window, mode='multiplot'):
+    def __init__(self, plot_window):
         super(PlotObject, self).__init__()
         self.plot_window = plot_window
         self.data_fields = self.plot_window.loader.get_header()[2:]
         self.n_data_fields = len(self.data_fields)
-        self.mode = mode
+        self.mode = 'singleplot'
 
         self.canvas = self.plot_window.canvas
         self.figure = self.plot_window.figure
@@ -26,29 +26,35 @@ class PlotObject(QtCore.QObject):
     def configure_axes(self):
         self.figure.clear()
         axes = []
-        if self.plot_window.single_plot_radioButton.isChecked():
-            self.mode = 'singleplot'
-        elif self.plot_window.multi_plot_radioButton.isChecked():
-            self.mode = 'multiplot'
+
         if self.mode == 'singleplot':
             axes = self.configure_singleplot_axes()
         elif self.mode == 'multiplot':
             axes = self.configure_multiplot_axes()
         self.axes = axes
 
-    def configure_multiplot_axes(self):
-        ax = self.figure.add_subplot(self.n_data_fields, 1, 1)
-        axes = [ax]
-        if self.n_data_fields > 1:
-            for n in range(2, self.n_data_fields+1):
-                ax = self.figure.add_subplot(self.n_data_fields, 1, n, sharex=axes[0])
-                axes.append(ax)
-        return axes
-
     def configure_singleplot_axes(self):
         ax = self.figure.add_subplot(1, 1, 1)
         axes = [ax]
         return axes
+
+    def configure_multiplot_axes(self):
+        ax = self.figure.add_subplot(self.n_data_fields, 1, 1)
+        axes = [ax]
+        if self.n_data_fields > 1:
+            for n in range(2, self.n_data_fields + 1):
+                ax = self.figure.add_subplot(self.n_data_fields, 1, n, sharex=axes[0])
+                axes.append(ax)
+        return axes
+
+    def plot(self):
+        self.plot_window.updating = True
+        self.load()
+        if self.mode == 'singleplot':
+            self.single_plot()
+        elif self.mode == 'multiplot':
+            self.multi_plot()
+        self.plot_window.updating = False
 
     def single_plot(self):
         plot_data = self.plot_window.data[self.data_fields]
@@ -88,16 +94,6 @@ class PlotObject(QtCore.QObject):
             clipped_zscore = (data - clipped_data_mean) / clipped_data_std
             clipped_data = clipped_data[np.abs(clipped_zscore) < self.plot_window.outlier_reject_level]
         return clipped_data
-
-    def plot(self):
-        self.plot_window.updating = True
-        self.load()
-        if self.mode == 'singleplot':
-            self.single_plot()
-        elif self.mode == 'multiplot':
-            self.multi_plot()
-        self.plot_window.updating = False
-        return
 
     def load(self):
         if self.plot_window.tracking:
@@ -185,6 +181,7 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.update_signal.emit()
 
     def update_settings(self):
+        self.pause()
         self.update_yaxis_settings()
         self.update_refresh_settings()
         if self.xscale_tabWidget.currentIndex() == 0:
@@ -192,10 +189,13 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         else:
             self.turn_off_tracking()
             self.set_xrange_range_mode()
-
-
+        if self.single_plot_radioButton.isChecked():
+            self.plot_object.mode = 'singleplot'
+        elif self.multi_plot_radioButton.isChecked():
+            self.plot_object.mode = 'multiplot'
         self.reconfigure_plot_signal.emit()
         self.update()
+        self.resume()
 
     def update_yaxis_settings(self):
         self.autoscale = self.autoscale_checkBox.isChecked()
