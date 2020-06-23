@@ -2,7 +2,7 @@ import pandas as pd
 import datetime
 import time
 from pathlib import Path
-
+import csv
 
 class Loader:
 
@@ -144,3 +144,10 @@ class Loader:
                   f'{stop_date.strftime(self.date_format)}')
             print(f'Refreshing took {(tf - t0):.3f} s')
         return self.data
+
+    def get_header(self):
+        file_path = list(Path(self.log_drive).glob('*.csv'))[0]  # extract header from first matching file
+        with open(file_path, 'r', newline='') as file:
+            reader = csv.reader(file)
+            header = next(reader)
+        return header

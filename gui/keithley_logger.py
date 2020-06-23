@@ -230,8 +230,8 @@ def write_to_csv(file_path, data_dict, quiet=True):
             raise ValueError(f'keys {keys} in data input do not match header {fieldnames} for {file_path}')
     else:
         fieldnames = keys
-
-    with open(file_path, 'a', newline='') as file:
+    file_path.parent.mkdir(exist_ok=True)
+    with file_path.open('a', newline='') as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         if not file_exists:
             writer.writeheader()

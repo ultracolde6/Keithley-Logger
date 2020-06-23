@@ -66,9 +66,13 @@ if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     keithley_logger_temp_path = Path('C:/', 'Users', 'Justin', 'Desktop', 'Working', 'Code', 'Keithley Logger Work')
     log_drive = Path(keithley_logger_temp_path, 'Log Drive', 'Fake Data')
+    log_drive_2 = Path(keithley_logger_temp_path, 'Log Drive', 'Mag Data Fake')
     file_prefix = 'Fake Data'
-    iongauge_data_loader = Loader(log_drive, file_prefix, quiet=True)
-    plotter = PlotWindow(iongauge_data_loader)
-    ui = PlotterManagerWindow([plotter])
+    fake_data_loader = Loader(log_drive, file_prefix, quiet=True)
+    mag_data_fake_loader = Loader(log_drive_2, 'Mag Data Fake', quiet=True)
+    plotter1 = PlotWindow(fake_data_loader)
+    plotter2 = PlotWindow(mag_data_fake_loader)
+
+    ui = PlotterManagerWindow([plotter1, plotter2])
     ui.show()
     sys.exit(app.exec_())

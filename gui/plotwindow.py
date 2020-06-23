@@ -1,6 +1,6 @@
 import datetime
 from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot
 from ui_plotwindow import Ui_PlotWindow
 import pandas as pd
 import numpy as np
@@ -20,41 +20,113 @@ class PlotWorker(QtCore.QObject):
         self.plotwindow.updating = False
 
 
-class SinglePlot:
-    def __init__(self, plot_window, channels, ax):
+class PlotObject(QtCore.QObject):
+    def __init__(self, plot_window, mode='multiplot'):
+        super(PlotObject, self).__init__()
         self.plot_window = plot_window
-        self.ax = ax
-        self.channels = channels
-        self.chan_labels = [chan.chan_name for chan in self.channels]
+        self.data_fields = self.plot_window.loader.get_header()[2:]
+        self.n_data_fields = len(self.data_fields)
+        self.mode = mode
 
-    def plot(self):
-        plot_data = self.plot_window.data[self.chan_labels]
-        self.ax.clear()
-        if self.plot_window.outlier_reject:
-            time_mask = np.logical_and(self.plot_window.start_datetime < plot_data.index,
-                                       plot_data.index < self.plot_window.stop_datetime)
-            clipped_data = plot_data[time_mask]
-            clipped_data_std = np.std(clipped_data)
-            clipped_data_mean = np.mean(clipped_data)
-            clipped_zscore = (plot_data - clipped_data_mean)/clipped_data_std
-            plot_data = plot_data[np.abs(clipped_zscore) < self.plot_window.outlier_reject_level]
+        self.canvas = self.plot_window.canvas
+        self.figure = self.plot_window.figure
+        self.axes = self.configure_axes()
+
+        self.plot_thread = QThread()
+        self.plot_thread.start()
+        self.moveToThread(self.plot_thread)
+
+    def configure_axes(self):
+        axes = []
+        if self.mode == 'singleplot':
+            axes = self.configure_singleplot_axes()
+        elif self.mode == 'multiplot':
+            axes = self.configure_multiplot_axes()
+        return axes
+
+    def configure_multiplot_axes(self):
+        ax = self.figure.add_subplot(self.n_data_fields, 1, 1)
+        axes = [ax]
+        if self.n_data_fields > 1:
+            for n in range(2, self.n_data_fields+1):
+                ax = self.figure.add_subplot(self.n_data_fields, 1, n, sharex=axes[0])
+                axes.append(ax)
+        return axes
+
+    def configure_singleplot_axes(self):
+        ax = self.figure.add_subplot(1, 1, 1)
+        axes = [ax]
+        return axes
+
+    def single_plot(self):
+        plot_data = self.plot_window.data[self.data_fields]
+        plot_data = self.clip_data(plot_data)
+        ax = self.axes[0]
+        ax.clear()
         try:
-            plot_data.plot(ax=self.ax, style='.')
+            plot_data.plot(ax=ax, style='.')
         except TypeError:
             print('No Data to plot')
         self.axis_scalings()
-        box = self.ax.get_position()
-        self.ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        # self.canvas.draw()
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        self.canvas.draw()
+
+    def multi_plot(self):
+        for n, field in enumerate(self.data_fields):
+            plot_data = self.plot_window.data[field]
+            plot_data = self.clip_data(plot_data)
+            ax = self.axes[n]
+            ax.clear()
+            try:
+                plot_data.plot(ax=ax, style='.')
+            except TypeError:
+                print('No Data to plot')
+            self.axis_scalings()
+            # box = ax.get_position()
+            # ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            # ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+            self.canvas.draw()
+
+    def clip_data(self, data):
+        time_mask = np.logical_and(self.plot_window.start_datetime < data.index,
+                                   data.index < self.plot_window.stop_datetime)
+        clipped_data = data[time_mask]
+        if self.plot_window.outlier_reject:
+            clipped_data_std = np.std(clipped_data)
+            clipped_data_mean = np.mean(clipped_data)
+            clipped_zscore = (data - clipped_data_mean) / clipped_data_std
+            clipped_data = clipped_data[np.abs(clipped_zscore) < self.plot_window.outlier_reject_level]
+        return clipped_data
+
+    def plot(self):
+        self.plot_window.updating = True
+        self.load()
+        if self.mode == 'singleplot':
+            self.single_plot()
+        elif self.mode == 'multiplot':
+            self.multi_plot()
+        self.plot_window.updating = False
+        return
+
+    def load(self):
+        if self.plot_window.tracking:
+            self.plot_window.stop_datetime = datetime.datetime.now()
+            self.plot_window.start_datetime = self.plot_window.stop_datetime - self.plot_window.history_delta
+            self.plot_window.data = self.plot_window.loader.refresh_data(self.plot_window.start_datetime)
+        else:
+            self.plot_window.data = self.plot_window.loader.grab_dates(self.plot_window.start_datetime.date(),
+                                                                       self.plot_window.stop_datetime.date())
 
     def axis_scalings(self):
-        if not self.plot_window.autoscale:
-            self.ax.set_ylim(self.plot_window.ymin, self.plot_window.ymax)
-        self.ax.set_yscale(self.plot_window.yscale)
-        self.ax.set_ylabel(self.plot_window.ylabel)
-        self.ax.set_xlabel('Time')
-        self.ax.set_xlim(self.plot_window.start_datetime, self.plot_window.stop_datetime)
+        for ax in self.axes:
+            if not self.plot_window.autoscale:
+                ax.set_ylim(self.plot_window.ymin, self.plot_window.ymax)
+            ax.set_yscale(self.plot_window.yscale)
+            ax.set_ylabel(self.plot_window.ylabel)
+            ax.set_xlabel('Time')
+            ax.set_xlim(self.plot_window.start_datetime, self.plot_window.stop_datetime)
 
 
 class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
@@ -67,9 +139,10 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
 
         self.canvas = self.plotwidget.canvas
         self.figure = self.canvas.figure
-        self.ax = None
-        self.set_axes()
+        # self.ax = None
+        # self.set_axes()
         self.ylabel = ylabel
+        self.plot_object = PlotObject(self)
 
         self.autoscale = None
         self.outlier_reject = None
@@ -92,65 +165,40 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.tracking = True
         self.updating = False
         self.refresh_timer = QtCore.QTimer(self)
-        self.refresh_timer.timeout.connect(self.attempt_update)
+        self.refresh_timer.timeout.connect(self.update)
         self.worker = PlotWorker(self)
-        self.update_signal.connect(self.worker.worker_update)
-        self.update_pushButton.clicked.connect(self.attempt_update)
+        self.update_signal.connect(self.plot_object.plot)
+        self.update_pushButton.clicked.connect(self.update)
 
         self.update_settings()
-        self.attempt_update()
+        self.update()
         self.show()
         self.refresh_timer.start(self.refresh_time)
 
-    # @pyqtSlot()
-    def attempt_update(self):
+    # def attempt_update(self):
+    #     """
+    #     The PlotWindow thread initiates the update process by first checking
+    #     if the update process is already occurring. If so it aborts, otherwise it continues.
+    #     The mechanism avoids generating a backlog of update requests in the plotting thread
+    #     if there are delays in that thread.
+    #     """
+    #
+    #     else:
+    #         self.update()
+
+    def update(self):
         if self.updating:
             curr_time = datetime.datetime.now()
             time_str = curr_time.strftime('%H:%M:%S')
             print(f'{time_str} Plot is currently updating. Cannot update until previous update is complete.')
             return
-        else:
-            self.update_signal.emit()
-
-    def update(self):
         if self.tracking:
             self.stop_datetime = datetime.datetime.now()
             self.start_datetime = self.stop_datetime - self.history_delta
             self.data = self.loader.refresh_data(self.start_datetime)
         else:
             self.data = self.loader.grab_dates(self.start_datetime.date(), self.stop_datetime.date())
-        self.plot()
-        self.updating = False
-
-    def plot(self):
-        self.ax.clear()
-        if self.outlier_reject:
-            time_mask = np.logical_and(self.start_datetime < self.data.index, self.data.index < self.stop_datetime)
-            clipped_data = self.data[time_mask]
-            clipped_data_std = np.std(clipped_data)
-            clipped_data_mean = np.mean(clipped_data)
-            clipped_zscore = (self.data - clipped_data_mean)/clipped_data_std
-            self.data = self.data[np.abs(clipped_zscore) < self.outlier_reject_level]
-        try:
-            self.data.plot(ax=self.ax, style='.')
-        except TypeError:
-            print('No Data to plot')
-        self.axis_scalings()
-        box = self.ax.get_position()
-        self.ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        self.canvas.draw()
-
-    def axis_scalings(self):
-        if not self.autoscale:
-            self.ax.set_ylim(self.ymin, self.ymax)
-        self.ax.set_yscale(self.yscale)
-        self.ax.set_ylabel(self.ylabel)
-        self.ax.set_xlabel('Time')
-        self.ax.set_xlim(self.start_datetime, self.stop_datetime)
-
-    def set_axes(self):
-        self.ax = self.figure.add_subplot(111)
+        self.update_signal.emit()
 
     def update_yaxis_settings(self):
         self.autoscale = self.autoscale_checkBox.isChecked()
@@ -224,7 +272,7 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         else:
             self.turn_off_tracking()
             self.set_xrange_range_mode()
-        self.attempt_update()
+        self.update()
 
     def turn_on_tracking(self):
         if not self.tracking:
@@ -258,43 +306,43 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.pause_pushButton.setText('Pause')
 
 
-class MagPlotWindow(PlotWindow):
-    def __init__(self, loader):
-        self.ax1 = None
-        self.ax2 = None
-        super(MagPlotWindow, self).__init__(loader)
-        self.autoscale_checkBox.setEnabled(False)
-        self.ymin_lineEdit.setEnabled(False)
-        self.ymax_lineEdit.setEnabled(False)
-
-    def set_axes(self):
-        self.ax1 = self.figure.add_subplot(211)
-        self.ax2 = self.figure.add_subplot(212, sharex=self.ax1)
-
-    def update(self):
-        if self.tracking:
-            self.stop_datetime = datetime.datetime.now()
-            self.start_datetime = self.stop_datetime - self.history_delta
-        self.loader.refresh_data(self.start_datetime)
-        data = self.loader.data
-        if data is None:
-            print('No data to plot')
-            return
-        self.ax1.clear()
-        self.ax2.clear()
-        try:
-            data.plot(ax=self.ax1)
-            (2*data).plot(ax=self.ax2)
-            self.axis_scalings()
-            for ax in [self.ax1, self.ax2]:
-                box = ax.get_position()
-                ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-            self.canvas.draw()
-        except TypeError:
-            print('No Data to plot')
-
-    def axis_scalings(self):
-        for ax in [self.ax1, self.ax2]:
-            ax.set_yscale(self.yscale)
-            ax.set_xlim(self.start_datetime, self.stop_datetime)
+# class MagPlotWindow(PlotWindow):
+#     def __init__(self, loader):
+#         self.ax1 = None
+#         self.ax2 = None
+#         super(MagPlotWindow, self).__init__(loader)
+#         self.autoscale_checkBox.setEnabled(False)
+#         self.ymin_lineEdit.setEnabled(False)
+#         self.ymax_lineEdit.setEnabled(False)
+#
+#     def set_axes(self):
+#         self.ax1 = self.figure.add_subplot(211)
+#         self.ax2 = self.figure.add_subplot(212, sharex=self.ax1)
+#
+#     def update(self):
+#         if self.tracking:
+#             self.stop_datetime = datetime.datetime.now()
+#             self.start_datetime = self.stop_datetime - self.history_delta
+#         self.loader.refresh_data(self.start_datetime)
+#         data = self.loader.data
+#         if data is None:
+#             print('No data to plot')
+#             return
+#         self.ax1.clear()
+#         self.ax2.clear()
+#         try:
+#             data.plot(ax=self.ax1)
+#             (2*data).plot(ax=self.ax2)
+#             self.axis_scalings()
+#             for ax in [self.ax1, self.ax2]:
+#                 box = ax.get_position()
+#                 ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+#                 ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+#             self.canvas.draw()
+#         except TypeError:
+#             print('No Data to plot')
+#
+#     def axis_scalings(self):
+#         for ax in [self.ax1, self.ax2]:
+#             ax.set_yscale(self.yscale)
+#             ax.set_xlim(self.start_datetime, self.stop_datetime)
