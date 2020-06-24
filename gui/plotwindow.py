@@ -6,30 +6,79 @@ import pandas as pd
 import numpy as np
 
 
-class PlotObject(QtCore.QObject):
+class PlotWorker(QtCore.QObject):
     def __init__(self, plot_window):
-        super(PlotObject, self).__init__()
+        super(PlotWorker, self).__init__()
         self.plot_window = plot_window
-        self.data_fields = self.plot_window.loader.get_header()[2:]
-        self.n_data_fields = len(self.data_fields)
-        self.mode = 'singleplot'
+        self.work_thread = QThread()
+        self.work_thread.start()
+        self.moveToThread(self.work_thread)
 
-        self.canvas = self.plot_window.canvas
-        self.figure = self.plot_window.figure
+    def run_update(self):
+        self.plot_window.plot()
+
+    def run_configure_axes(self):
+        self.plot_window.configure_axes()
+
+
+class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
+    update_signal = pyqtSignal()
+    reconfigure_plot_signal = pyqtSignal()
+
+    def __init__(self, loader, ylabel='Signal Level'):
+        super(PlotWindow, self).__init__()
+        self.loader = loader
+        self.setupUi(self)
+
+        self.canvas = self.plotwidget.canvas
+        self.figure = self.canvas.figure
         self.axes = None
-        self.configure_axes()
+        self.ylabel = ylabel
+        self.plot_worker = PlotWorker(self)
 
-        self.plot_thread = QThread()
-        self.plot_thread.start()
-        self.moveToThread(self.plot_thread)
+        self.data_fields = self.loader.get_header()[2:]
+        self.n_data_fields = len(self.data_fields)
+
+        self.autoscale = None
+        self.outlier_reject = None
+        self.yscale = None
+        self.ymin = None
+        self.ymax = None
+        self.refresh_time = 30
+        self.stop_datetime = None
+        self.start_datetime = None
+        self.history_days = None
+        self.history_hours = None
+        self.history_minutes = None
+        self.history_delta = None
+        self.outlier_reject_level = 2
+        self.plot_mode = 'singleplot'
+
+        self.data = pd.DataFrame()
+        self.paused = False
+        self.pause_pushButton.clicked.connect(self.pause_resume_clicked)
+        self.settings_pushButton.clicked.connect(self.update_settings)
+        self.tracking = True
+        self.updating = False
+        self.refresh_timer = QtCore.QTimer(self)
+        self.refresh_timer.timeout.connect(self.update)
+        self.update_signal.connect(self.plot_worker.run_update)
+        self.update_pushButton.clicked.connect(self.update)
+        self.reconfigure_plot_signal.connect(self.plot_worker.run_configure_axes)
+
+        self.reconfigure_plot_signal.emit()
+        self.update_settings()
+        self.update()
+        self.show()
+        self.refresh_timer.start(self.refresh_time)
 
     def configure_axes(self):
         self.figure.clear()
         axes = []
 
-        if self.mode == 'singleplot':
+        if self.plot_mode == 'singleplot':
             axes = self.configure_singleplot_axes()
-        elif self.mode == 'multiplot':
+        elif self.plot_mode == 'multiplot':
             axes = self.configure_multiplot_axes()
         self.axes = axes
 
@@ -48,16 +97,16 @@ class PlotObject(QtCore.QObject):
         return axes
 
     def plot(self):
-        self.plot_window.updating = True
+        self.updating = True
         self.load()
-        if self.mode == 'singleplot':
+        if self.plot_mode == 'singleplot':
             self.single_plot()
-        elif self.mode == 'multiplot':
+        elif self.plot_mode == 'multiplot':
             self.multi_plot()
-        self.plot_window.updating = False
+        self.updating = False
 
     def single_plot(self):
-        plot_data = self.plot_window.data[self.data_fields]
+        plot_data = self.data[self.data_fields]
         plot_data = self.clip_data(plot_data)
         ax = self.axes[0]
         ax.clear()
@@ -73,7 +122,7 @@ class PlotObject(QtCore.QObject):
 
     def multi_plot(self):
         for n, field in enumerate(self.data_fields):
-            plot_data = self.plot_window.data[field]
+            plot_data = self.data[field]
             plot_data = self.clip_data(plot_data)
             ax = self.axes[n]
             ax.clear()
@@ -85,80 +134,32 @@ class PlotObject(QtCore.QObject):
             self.canvas.draw()
 
     def clip_data(self, data):
-        time_mask = np.logical_and(self.plot_window.start_datetime < data.index,
-                                   data.index < self.plot_window.stop_datetime)
+        time_mask = np.logical_and(self.start_datetime < data.index,
+                                   data.index < self.stop_datetime)
         clipped_data = data[time_mask]
-        if self.plot_window.outlier_reject:
+        if self.outlier_reject:
             clipped_data_std = np.std(clipped_data)
             clipped_data_mean = np.mean(clipped_data)
             clipped_zscore = (data - clipped_data_mean) / clipped_data_std
-            clipped_data = clipped_data[np.abs(clipped_zscore) < self.plot_window.outlier_reject_level]
+            clipped_data = clipped_data[np.abs(clipped_zscore) < self.outlier_reject_level]
         return clipped_data
 
     def load(self):
-        if self.plot_window.tracking:
-            self.plot_window.stop_datetime = datetime.datetime.now()
-            self.plot_window.start_datetime = self.plot_window.stop_datetime - self.plot_window.history_delta
-            self.plot_window.data = self.plot_window.loader.refresh_data(self.plot_window.start_datetime)
+        if self.tracking:
+            self.stop_datetime = datetime.datetime.now()
+            self.start_datetime = self.stop_datetime - self.history_delta
+            self.data = self.loader.refresh_data(self.start_datetime)
         else:
-            self.plot_window.data = self.plot_window.loader.grab_dates(self.plot_window.start_datetime.date(),
-                                                                       self.plot_window.stop_datetime.date())
+            self.data = self.loader.grab_dates(self.start_datetime.date(), self.stop_datetime.date())
 
     def axis_scalings(self):
         for ax in self.axes:
-            if not self.plot_window.autoscale:
-                ax.set_ylim(self.plot_window.ymin, self.plot_window.ymax)
-            ax.set_yscale(self.plot_window.yscale)
-            ax.set_ylabel(self.plot_window.ylabel)
+            if not self.autoscale:
+                ax.set_ylim(self.ymin, self.ymax)
+            ax.set_yscale(self.yscale)
+            ax.set_ylabel(self.ylabel)
             ax.set_xlabel('Time')
-            ax.set_xlim(self.plot_window.start_datetime, self.plot_window.stop_datetime)
-
-
-class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
-    update_signal = pyqtSignal()
-    reconfigure_plot_signal = pyqtSignal()
-
-    def __init__(self, loader, ylabel='Signal Level'):
-        super(PlotWindow, self).__init__()
-        self.loader = loader
-        self.setupUi(self)
-
-        self.canvas = self.plotwidget.canvas
-        self.figure = self.canvas.figure
-        self.ylabel = ylabel
-        self.plot_object = PlotObject(self)
-
-        self.autoscale = None
-        self.outlier_reject = None
-        self.yscale = None
-        self.ymin = None
-        self.ymax = None
-        self.refresh_time = 30
-        self.stop_datetime = None
-        self.start_datetime = None
-        self.history_days = None
-        self.history_hours = None
-        self.history_minutes = None
-        self.history_delta = None
-        self.outlier_reject_level = 2
-        self.plot_mode = None
-
-        self.data = pd.DataFrame()
-        self.paused = False
-        self.pause_pushButton.clicked.connect(self.pause_resume_clicked)
-        self.settings_pushButton.clicked.connect(self.update_settings)
-        self.tracking = True
-        self.updating = False
-        self.refresh_timer = QtCore.QTimer(self)
-        self.refresh_timer.timeout.connect(self.update)
-        self.update_signal.connect(self.plot_object.plot)
-        self.update_pushButton.clicked.connect(self.update)
-        self.reconfigure_plot_signal.connect(self.plot_object.configure_axes)
-
-        self.update_settings()
-        self.update()
-        self.show()
-        self.refresh_timer.start(self.refresh_time)
+            ax.set_xlim(self.start_datetime, self.stop_datetime)
 
     def update(self):
         """
@@ -172,12 +173,6 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
             time_str = curr_time.strftime('%H:%M:%S')
             print(f'{time_str} Plot is currently updating. Cannot update until previous update is complete.')
             return
-        if self.tracking:
-            self.stop_datetime = datetime.datetime.now()
-            self.start_datetime = self.stop_datetime - self.history_delta
-            self.data = self.loader.refresh_data(self.start_datetime)
-        else:
-            self.data = self.loader.grab_dates(self.start_datetime.date(), self.stop_datetime.date())
         self.update_signal.emit()
 
     def update_settings(self):
@@ -186,13 +181,13 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.update_refresh_settings()
         if self.xscale_tabWidget.currentIndex() == 0:
             self.set_xrange_history_mode()
-        else:
+        elif self.xscale_tabWidget.currentIndex() == 1:
             self.turn_off_tracking()
             self.set_xrange_range_mode()
         if self.single_plot_radioButton.isChecked():
-            self.plot_object.mode = 'singleplot'
+            self.plot_mode = 'singleplot'
         elif self.multi_plot_radioButton.isChecked():
-            self.plot_object.mode = 'multiplot'
+            self.plot_mode = 'multiplot'
         self.reconfigure_plot_signal.emit()
         self.update()
         self.resume()
@@ -234,8 +229,8 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
             self.turn_on_tracking()
         else:
             try:
-                self.turn_off_tracking()
                 self.stop_datetime = datetime.datetime.strptime(history_stopdate_text, '%y/%m/%d %H:%M:%S')
+                self.turn_off_tracking()
             except ValueError:
                 print('invalid input for stop date, input must be formatted as YY/MM/DD HH:MM:SS')
         try:
@@ -289,45 +284,3 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.refresh_timer.start(self.refresh_time)
         self.pause_pushButton.setText('Pause')
         self.paused = False
-
-
-# class MagPlotWindow(PlotWindow):
-#     def __init__(self, loader):
-#         self.ax1 = None
-#         self.ax2 = None
-#         super(MagPlotWindow, self).__init__(loader)
-#         self.autoscale_checkBox.setEnabled(False)
-#         self.ymin_lineEdit.setEnabled(False)
-#         self.ymax_lineEdit.setEnabled(False)
-#
-#     def set_axes(self):
-#         self.ax1 = self.figure.add_subplot(211)
-#         self.ax2 = self.figure.add_subplot(212, sharex=self.ax1)
-#
-#     def update(self):
-#         if self.tracking:
-#             self.stop_datetime = datetime.datetime.now()
-#             self.start_datetime = self.stop_datetime - self.history_delta
-#         self.loader.refresh_data(self.start_datetime)
-#         data = self.loader.data
-#         if data is None:
-#             print('No data to plot')
-#             return
-#         self.ax1.clear()
-#         self.ax2.clear()
-#         try:
-#             data.plot(ax=self.ax1)
-#             (2*data).plot(ax=self.ax2)
-#             self.axis_scalings()
-#             for ax in [self.ax1, self.ax2]:
-#                 box = ax.get_position()
-#                 ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-#                 ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-#             self.canvas.draw()
-#         except TypeError:
-#             print('No Data to plot')
-#
-#     def axis_scalings(self):
-#         for ax in [self.ax1, self.ax2]:
-#             ax.set_yscale(self.yscale)
-#             ax.set_xlim(self.start_datetime, self.stop_datetime)
