@@ -1,4 +1,4 @@
-import keithley_logger as kl
+import logger as kl
 import numpy as np
 import datetime
 import time

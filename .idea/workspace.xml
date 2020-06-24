@@ -6,7 +6,10 @@
   <component name="ChangeListManager">
     <list default="true" id="cd42c67b-0b47-4081-b409-dc058a648172" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$" beforeDir="false" afterPath="$PROJECT_DIR$" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gui/plotwindow.py" beforeDir="false" afterPath="$PROJECT_DIR$/gui/plotwindow.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gui/Logger.py" beforeDir="false" afterPath="$PROJECT_DIR$/gui/log_script.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gui/fake_data_generator.py" beforeDir="false" afterPath="$PROJECT_DIR$/gui/fake_data_generator.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gui/keithley_logger.py" beforeDir="false" afterPath="$PROJECT_DIR$/gui/logger.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../jkam/GuppyDriver.py" beforeDir="false" afterPath="$PROJECT_DIR$/../jkam/GuppyDriver.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />

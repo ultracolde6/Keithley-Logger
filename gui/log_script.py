@@ -1,7 +1,7 @@
 import datetime
 import time
 import threading
-import gui.keithley_logger as keithley_logger
+import gui.logger as logger
 from pathlib import Path
 
 
@@ -37,14 +37,14 @@ def main():
     # t_plot_history = datetime.timedelta(hours=12)  # How far back in history the plots should reach
 
     # Bartington Mag690-100 outputs 100 mV/uT = 0.01 V/mG so 100 mG/V, 100 uG/mV
-    mag_x = keithley_logger.Channel(hard_port=101, chan_name='Mag X', conv_func=lambda v: v * 100)
-    mag_y = keithley_logger.Channel(hard_port=102, chan_name='Mag Y', conv_func=lambda v: v * 100)
-    mag_z = keithley_logger.Channel(hard_port=103, chan_name='Mag Z', conv_func=lambda v: v * 100)
-    mag_group = keithley_logger.SaveGroup([mag_x, mag_y, mag_z], group_name='MagField', quiet=True,
-                                          log_drive=Path(log_drive, 'MagField'),
-                                          backup_drive=Path(backup_drive, 'MagField'),
-                                          error_drive=error_drive,
-                                          webplot_drive=webplot_drive)
+    mag_x = logger.Channel(hard_port=101, chan_name='Mag X', conv_func=lambda v: v * 100)
+    mag_y = logger.Channel(hard_port=102, chan_name='Mag Y', conv_func=lambda v: v * 100)
+    mag_z = logger.Channel(hard_port=103, chan_name='Mag Z', conv_func=lambda v: v * 100)
+    mag_group = logger.SaveGroup([mag_x, mag_y, mag_z], group_name='MagField', quiet=True,
+                                 log_drive=Path(log_drive, 'MagField'),
+                                 backup_drive=Path(backup_drive, 'MagField'),
+                                 error_drive=error_drive,
+                                 webplot_drive=webplot_drive)
 
     # Terranova ion gauge controller reads out a pseudo-logarithmic voltage. It is 0.5 volts per decade and has
     # an offset. The Terranova manual expresses this in a very confusing way that makes it difficult to determine
@@ -61,12 +61,12 @@ def main():
     # current of the ion pump. Now it is configured to give a logarithmic reading of the current. The offset is
     # adjustable and set to 10 volts. This means that a current 1 A would register as 10 volts and 1e-8 A (10 nA)
     # would register as 2V. The data saved here is Log10(I/I0).
-    ion_pump = keithley_logger.Channel(hard_port=104, chan_name='IonPump', conv_func=lambda v: (v - 10))
-    ion_pump_group = keithley_logger.SaveGroup([ion_pump], group_name='IonPump', quiet=True,
-                                               log_drive=Path(log_drive, 'IonPump'),
-                                               backup_drive=Path(backup_drive, 'IonPump'),
-                                               error_drive=error_drive,
-                                               webplot_drive=webplot_drive)
+    ion_pump = logger.Channel(hard_port=104, chan_name='IonPump', conv_func=lambda v: (v - 10))
+    ion_pump_group = logger.SaveGroup([ion_pump], group_name='IonPump', quiet=True,
+                                      log_drive=Path(log_drive, 'IonPump'),
+                                      backup_drive=Path(backup_drive, 'IonPump'),
+                                      error_drive=error_drive,
+                                      webplot_drive=webplot_drive)
 
     # Omega temperature converters readout 1 degree per mV.
     # temp_exp_cloud = kmm_data_handler.Channel(hard_port=108, chan_name='Temp_exp_cloud', conv_func=lambda v: 1000 * v)
@@ -87,9 +87,9 @@ def main():
     #     save_group.plotter.t_plot_history = t_plot_history
     #     save_group.plotter.show = False
 
-    kmm = keithley_logger.Keithley(port=kmm_port, timeout=15, quiet=True)
+    kmm = logger.Keithley(port=kmm_port, timeout=15, quiet=True)
 
-    controller = keithley_logger.Logger(save_groups=save_groups, device=kmm)
+    controller = logger.Logger(save_groups=save_groups, device=kmm)
 
     logger_thread = threading.Thread(target=logger_routine, args=(controller, t_read_freq))
     logger_thread.start()
