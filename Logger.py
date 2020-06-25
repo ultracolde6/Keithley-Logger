@@ -55,13 +55,13 @@ def main():
     # an offset. The Terranova manual expresses this in a very confusing way that makes it difficult to determine
     # the offset. There is a write up in onenote and on the server about it. The data saved here is Log10(P/P0).
     # The actual pressures (1e-10 level) are too high of precision to be straightforwardly stored in the .csv.
-    # ion_gauge = kmm_data_handler.Channel(hard_port=110, chan_name='IonGauge', conv_func=lambda v: (v - 5) / 0.5)
-    # ion_gauge_group = kmm_data_handler.SaveGroup([ion_gauge], group_name='IonGauge', quiet=True,
-    #                                              log_drive=log_drive + 'IonGauge/',
-    #                                              backup_drive=backup_drive + 'IonGauge/',
-    #                                              error_drive=error_drive,
-    #                                              webplot_drive=webplot_drive)
-    # ion_gauge_group.plotter.plot_func = kmm_plot_funcs.make_ion_gauge_plot
+    ion_gauge = kmm_data_handler.Channel(hard_port=106, chan_name='IonGauge', conv_func=lambda v: (v - 5) / 0.5)
+    ion_gauge_group = kmm_data_handler.SaveGroup([ion_gauge], group_name='IonGauge', quiet=True,
+                                                 log_drive=log_drive + 'IonGauge/',
+                                                 backup_drive=backup_drive + 'IonGauge/',
+                                                 error_drive=error_drive,
+                                                 webplot_drive=webplot_drive)
+    ion_gauge_group.plotter.plot_func = kmm_plot_funcs.make_ion_gauge_plot
 
     # Gamma ion pump controller outputs a logarithmic voltage which is related to either the measured pressure or
     # current of the ion pump. Now it is configured to give a logarithmic reading of the current. The offset is
@@ -126,7 +126,7 @@ def main():
     # bake_group_3.plotter.ylabel = r'Temperature ($^{\circ}C)$'
 
     # save_groups = [mag_group, ion_pump_group, temp_group, ion_gauge_group]
-    save_groups = [mag_group, ion_pump_group]
+    save_groups = [mag_group, ion_pump_group, ion_gauge_group]
 
     for save_group in save_groups:
         save_group.plotter.t_plot_freq = t_plot_freq
