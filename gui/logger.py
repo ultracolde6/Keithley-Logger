@@ -4,7 +4,8 @@ import datetime
 from pathlib import Path
 import csv
 from gui.loader import Loader
-from PyQt5 import QtCore
+from PyQt5 import QtCore, QtSerialPort
+from PyQt5.QtCore import QIODevice
 from PyQt5.QtSerialPort import QSerialPort
 
 
@@ -56,12 +57,15 @@ class Keithley:
         self.serial = None
 
     def __enter__(self):
-        self.serial = QSerialPort(self.port)
+        self.serial = QSerialPort()
+        self.serial.setPortName(self.port)
+        self.serial.setBaudRate(QSerialPort.Baud9600)
+        self.serial.open(QIODevice.ReadWrite)
         print(f'Connected to device at {self.port}')
         for command in self.preamble:
             self.write(command)
             time.sleep(0.5)
-        # self.serial.flushInput()
+        self.serial.flush()
         print(f'Keithley initialized')
         return self
 
@@ -93,7 +97,15 @@ class Keithley:
     def read(self):
         # Read data from Keithley and return list of floats representing recorded values
         self.write("READ?\n")
-        data = self.serial.read_until(b"\r").decode().split(',')
+        # data = self.serial.read_until(b"\n").decode().split(',')
+        data = self.serial.readLine()
+        print(data)
+        data = str(data)
+        print(data)
+        data = data.split(',')
+        print(data)
+        # data = str(self.serial.readLine()).split(',')
+        # print(data)
         data = list(map(float, data))
         return data
 

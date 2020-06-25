@@ -7,7 +7,7 @@ from pathlib import Path
 
 def logger_routine(keithley_device, save_groups, t_read_freq):
     # This opens the serial port and initializes the multimeter
-    with keithley_device as kmm:
+    with keithley_device.device as kmm:
         # Initialize channels
         channels = [chan for save_group in save_groups for chan in save_group.channels]
         kmm.init_measurement(channels)
@@ -16,7 +16,7 @@ def logger_routine(keithley_device, save_groups, t_read_freq):
         while True:
             try:
                 curr_time = datetime.datetime.now()
-                kmm.get_data(save_groups)
+                kmm.read_data()
                 while curr_time + delay > datetime.datetime.now():
                     time.sleep(1)
             except (KeyboardInterrupt, SystemExit):
@@ -87,11 +87,11 @@ def main():
     #     save_group.plotter.t_plot_history = t_plot_history
     #     save_group.plotter.show = False
 
-    kmm = logger.Keithley(port=kmm_port, timeout=15, quiet=True)
+    kmm = logger.Keithley(port=kmm_port, timeout=15, quiet=False)
 
-    controller = logger.Logger(save_groups=save_groups, device=kmm)
+    controller = logger.Logger(save_groups=save_groups, device=kmm, log_freq=t_read_freq)
 
-    logger_thread = threading.Thread(target=logger_routine, args=(controller, t_read_freq))
+    logger_thread = threading.Thread(target=logger_routine, args=(controller, save_groups, t_read_freq))
     logger_thread.start()
 
 
