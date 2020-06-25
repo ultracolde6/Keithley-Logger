@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 import csv
 
+
 class Loader:
 
     def __init__(self, log_drive, file_prefix, date_format='%Y-%m-%d', time_format='%H:%M:%S', quiet=True):
@@ -122,7 +123,7 @@ class Loader:
                                        index_col='datetime',
                                        infer_datetime_format=True)
                 new_data.index = pd.to_datetime(new_data.index)
-                new_row_count = len(new_data.index)
+                new_row_count = new_data.shape[0]
                 if new_row_count > 0:
                     self.data = self.data.append(new_data)
                 if date == stop_date:
@@ -147,7 +148,7 @@ class Loader:
 
     def get_header(self):
         file_path = list(Path(self.log_drive).glob('*.csv'))[0]  # extract header from first matching file
-        with open(file_path, 'r', newline='') as file:
+        with file_path.open('r', newline='') as file:
             reader = csv.reader(file)
             header = next(reader)
         return header

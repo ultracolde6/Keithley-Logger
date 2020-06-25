@@ -165,7 +165,7 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         """
         The PlotWindow thread initiates the update process by first checking
         if the update process is already occurring. If so it aborts, otherwise it continues.
-        The mechanism avoids generating a backlog of update requests in the plotting thread
+        The mechanism avoids generating a backlog of update requests in the working thread
         if there are delays in that thread.
         """
         if self.updating:

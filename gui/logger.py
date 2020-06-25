@@ -1,4 +1,4 @@
-import serial
+# import serial
 import time
 import datetime
 from pathlib import Path
@@ -53,15 +53,15 @@ class Keithley:
         self.log_freq = log_freq
         self.timeout = timeout
         self.quiet = quiet
-        self.serial = QSerialPort()
+        self.serial = None
 
     def __enter__(self):
-        self.serial = serial.Serial(self.port, timeout=self.timeout)
+        self.serial = QSerialPort(self.port)
         print(f'Connected to device at {self.port}')
         for command in self.preamble:
             self.write(command)
             time.sleep(0.5)
-        self.serial.flushInput()
+        # self.serial.flushInput()
         print(f'Keithley initialized')
         return self
 
