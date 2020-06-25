@@ -2,6 +2,7 @@ import pandas as pd
 import datetime
 import time
 from pathlib import Path
+import csv
 
 
 class Loader:
@@ -116,13 +117,13 @@ class Loader:
                 # Load in new data. Note that lines up until line number self.lines_loaded are skipped
                 new_data = pd.read_csv(file_path,
                                        header=0,
-                                       skiprows=range(1, self.lines_loaded),
+                                       skiprows=range(1, self.lines_loaded + 1),
                                        parse_dates={'datetime': ['date', 'time']},
                                        # parse_dates={'datetime': [0, 1]},
                                        index_col='datetime',
                                        infer_datetime_format=True)
                 new_data.index = pd.to_datetime(new_data.index)
-                new_row_count = len(new_data.index)
+                new_row_count = new_data.shape[0]
                 if new_row_count > 0:
                     self.data = self.data.append(new_data)
                 if date == stop_date:
@@ -144,3 +145,10 @@ class Loader:
                   f'{stop_date.strftime(self.date_format)}')
             print(f'Refreshing took {(tf - t0):.3f} s')
         return self.data
+
+    def get_header(self):
+        file_path = list(Path(self.log_drive).glob('*.csv'))[0]  # extract header from first matching file
+        with file_path.open('r', newline='') as file:
+            reader = csv.reader(file)
+            header = next(reader)
+        return header

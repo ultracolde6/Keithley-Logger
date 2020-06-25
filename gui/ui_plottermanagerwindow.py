@@ -54,9 +54,6 @@ class PlotterManagerWindow(QtWidgets.QMainWindow):
         self.setWindowTitle(_translate("PlotterManagerWindow", "MainWindow"))
 
     def checkbox_changed(self, plotter_num):
-        print(plotter_num)
-        print(self.checkboxes[plotter_num])
-        print(self.plotters[plotter_num])
         if self.checkboxes[plotter_num].isChecked():
             self.plotters[plotter_num].show()
         else:
@@ -67,10 +64,15 @@ class PlotterManagerWindow(QtWidgets.QMainWindow):
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
-    log_drive = Path('Y:/', 'E6', 'DataRaid E6', 'Data', 'KeithleyLogger', 'IonGauge')
-    file_prefix = 'IonGauge'
-    iongauge_data_loader = Loader(log_drive, file_prefix, quiet=True)
-    plotter = PlotWindow(iongauge_data_loader)
-    ui = PlotterManagerWindow([plotter])
+    keithley_logger_temp_path = Path('C:/', 'Users', 'Justin', 'Desktop', 'Working', 'Code', 'Keithley Logger Work')
+    log_drive = Path(keithley_logger_temp_path, 'Log Drive', 'Fake Data')
+    log_drive_2 = Path(keithley_logger_temp_path, 'Log Drive', 'Mag Data Fake')
+    file_prefix = 'Fake Data'
+    fake_data_loader = Loader(log_drive, file_prefix, quiet=True)
+    mag_data_fake_loader = Loader(log_drive_2, 'Mag Data Fake', quiet=True)
+    plotter1 = PlotWindow(fake_data_loader)
+    plotter2 = PlotWindow(mag_data_fake_loader)
+
+    ui = PlotterManagerWindow([plotter1, plotter2])
     ui.show()
     sys.exit(app.exec_())

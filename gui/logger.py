@@ -1,10 +1,38 @@
-import serial
+# import serial
 import time
 import datetime
 from pathlib import Path
 import csv
-from loader import Loader
-from plotwindow import PlotWindow
+from gui.loader import Loader
+from PyQt5 import QtCore
+from PyQt5.QtSerialPort import QSerialPort
+
+
+class Logger(QtCore.QObject):
+    """
+    Configure data acquisition, process/organize data as it comes in, and control visualization of data
+    """
+    def __init__(self, save_groups, device, log_freq, quiet=False):
+        super(Logger, self).__init__()
+        self.save_groups = save_groups
+        self.channels = []
+        for save_group in self.save_groups:
+            for channel in save_group.channels:
+                self.channels.append(channel)  # Add all of the channels in all of the save_groups into self.channels
+        self.device = device
+        self.log_freq = log_freq
+        self.quiet = quiet
+
+        self.data_timer = QtCore.QTimer(self)
+        self.data_timer.timeout.connect(self.log_data)
+        self.data_timer.start(self.log_freq)
+
+    def log_data(self):
+        curr_time, data = self.device.read_data()
+        for chan in self.channels:
+            chan.curr_data = chan.conv_func(data[chan.chan_idx])  # Consider saving raw data instead of converted data
+        for save_group in self.save_groups:
+            save_group.save_data(curr_time)
 
 
 class Keithley:
@@ -20,18 +48,20 @@ class Keithley:
                 "TRIG:COUN 1\n",
                 "FORM:ELEM READ\n"]
 
-    def __init__(self, port='COM0', timeout=15, quiet=True):
+    def __init__(self, port='COM0', log_freq=30, timeout=15, quiet=True):
         self.port = port
+        self.log_freq = log_freq
         self.timeout = timeout
         self.quiet = quiet
+        self.serial = None
 
     def __enter__(self):
-        self.serial = serial.Serial(self.port, timeout=self.timeout)
+        self.serial = QSerialPort(self.port)
         print(f'Connected to device at {self.port}')
         for command in self.preamble:
             self.write(command)
             time.sleep(0.5)
-        self.serial.flushInput()
+        # self.serial.flushInput()
         print(f'Keithley initialized')
         return self
 
@@ -39,7 +69,9 @@ class Keithley:
         try:
             close_it = self.serial.close
             print('Closing serial connection with Keithley')
-        except AttributeError:
+        except AttributeError as er:
+            print('Exception during serial closing:')
+            print(er)
             # TODO check what this might be catching?
             pass
         else:
@@ -81,8 +113,7 @@ class Keithley:
         self.write(f"SAMP:COUN {len(channels)}\n")
         self.write("ROUT:SCAN:LSEL INT\n")
 
-    def get_data(self, save_groups):
-        channels = [chan for save_group in save_groups for chan in save_group.channels]
+    def read_data(self):
         curr_time = datetime.datetime.now()
         date_time_string = curr_time.strftime('%Y-%m-%d %H:%M:%S')
         data = self.read()
@@ -94,10 +125,7 @@ class Keithley:
                 print(date_time_string + ": Error: Received nothing from Keithley")
             else:
                 print(date_time_string + f": Error: Received {data} from Keithley")
-        for chan in channels:
-            chan.curr_data = chan.conv_func(data[chan.chan_idx])  # Consider saving raw data instead of converted data
-        for save_group in save_groups:
-            save_group.save_data(curr_time)
+        return curr_time, data
 
     @staticmethod
     def volt_cmds(chan_num):
@@ -156,7 +184,8 @@ class SaveGroup:
         self.time_format = time_format
         self.loader = Loader(log_drive, group_name, date_format, time_format)
         self.data_label = data_label
-        self.plotwindow = PlotWindow(self.loader, ylabel=self.data_label)
+        # self.plotwindow = PlotWindow(self.loader, ylabel=self.data_label)
+        # TODO: savegroup shouldn't contain the plotter, this should be seperate
         self.quiet = quiet
 
     def save_data(self, time_stamp):
@@ -201,8 +230,8 @@ def write_to_csv(file_path, data_dict, quiet=True):
             raise ValueError(f'keys {keys} in data input do not match header {fieldnames} for {file_path}')
     else:
         fieldnames = keys
-
-    with open(file_path, 'a', newline='') as file:
+    file_path.parent.mkdir(exist_ok=True)
+    with file_path.open('a', newline='') as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         if not file_exists:
             writer.writeheader()
