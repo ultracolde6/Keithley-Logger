@@ -42,38 +42,38 @@ class Controller:
             chan.chan_idx = idx
             self.device.write(chan.init_cmds)
         chan_list_str = '(@' + ','.join([str(chan.hard_port) for chan in self.channels]) + ')'
-        self.device.write("ROUT:SCAN " + chan_list_str + "\r")
+        self.device.write("ROUT:SCAN " + chan_list_str)
         """
         it is the enumeration in chan_list_str which will determine the order in which the channels are read out
         through the "ROUT:SCAN (@...)" command. This is where chan_idx for each channel is configured to match up
         with the data coming out of the Keithley.
         """
 
-        self.device.write(f"SAMP:COUN {len(self.channels)}\r")
-        self.device.write("ROUT:SCAN:LSEL INT\r")
+        self.device.write(f"SAMP:COUN {len(self.channels)}")
+        self.device.write("ROUT:SCAN:LSEL INT")
 
     @staticmethod
     def volt_cmds(chan_num):
-        return ["SENS:FUNC 'VOLT',(@" + str(chan_num) + ")\r",
-                "SENS:VOLT:NPLC 5,(@" + str(chan_num) + ")\r",
-                "SENS:VOLT:RANG 5,(@" + str(chan_num) + ")\r"]
+        return ["SENS:FUNC 'VOLT',(@" + str(chan_num) + ")",
+                "SENS:VOLT:NPLC 5,(@" + str(chan_num) + ")",
+                "SENS:VOLT:RANG 5,(@" + str(chan_num) + ")"]
 
     @staticmethod
     def rtd_cmds(chan_num):
-        return ["SENS:FUNC 'TEMP',(@" + str(chan_num) + ")\r",
-                "SENS:TEMP:TRAN FRTD,(@" + str(chan_num) + ")\r",
-                "SENS:TEMP:FRTD:TYPE PT100,(@" + str(chan_num) + ")\r",
-                "SENS:TEMP:NPLC 5,(@" + str(chan_num) + ")\r"]
+        return ["SENS:FUNC 'TEMP',(@" + str(chan_num) + ")",
+                "SENS:TEMP:TRAN FRTD,(@" + str(chan_num) + ")",
+                "SENS:TEMP:FRTD:TYPE PT100,(@" + str(chan_num) + ")",
+                "SENS:TEMP:NPLC 5,(@" + str(chan_num) + ")"]
 
     @staticmethod
     def thcpl_cmds(chan_num):
-        return ["SENS:FUNC 'TEMP',(@" + str(chan_num) + ")\r",
-                "SENS:TEMP:TRAN TC,(@" + str(chan_num) + ")\r",
-                "SENS:TEMP:TC:TYPE K,(@" + str(chan_num) + ")\r",
+        return ["SENS:FUNC 'TEMP',(@" + str(chan_num) + ")",
+                "SENS:TEMP:TRAN TC,(@" + str(chan_num) + ")",
+                "SENS:TEMP:TC:TYPE K,(@" + str(chan_num) + ")",
                 # "SENS:TEMP:TC:RJUN:RSEL INT,(@" + str(chan_num) + ")\r",
-                "SENS:TEMP:TC:RJUN:RSEL SIM,(@" + str(chan_num) + ")\r",
-                "SENS:TEMP:TC:RJUN:SIM 23,(@" + str(chan_num) + ")\r",
-                "SENS:TEMP:NPLC 5,(@" + str(chan_num) + ")\r"]
+                "SENS:TEMP:TC:RJUN:RSEL SIM,(@" + str(chan_num) + ")",
+                "SENS:TEMP:TC:RJUN:SIM 23,(@" + str(chan_num) + ")",
+                "SENS:TEMP:NPLC 5,(@" + str(chan_num) + ")"]
 
 
 class Keithley:
@@ -83,14 +83,14 @@ class Keithley:
         self.baud = baud
         self.timeout = timeout
         self.quiet = quiet
-        self.preamble = ["*RST\r",
-                         "SYST:PRES\r",
-                         "SYST:BEEP OFF\r",
-                         "TRAC:CLE\r",
-                         "TRAC:CLE:AUTO OFF\r",
-                         "INIT:CONT OFF\r",
-                         "TRIG:COUN 1\r",
-                         "FORM:ELEM READ\r"]
+        self.preamble = ["*RST",
+                         "SYST:PRES",
+                         "SYST:BEEP OFF",
+                         "TRAC:CLE",
+                         "TRAC:CLE:AUTO OFF",
+                         "INIT:CONT OFF",
+                         "TRIG:COUN 1",
+                         "FORM:ELEM READ"]
 
     def __enter__(self):
         self.serial = serial.Serial(self.port, self.baud, timeout=self.timeout)
@@ -115,8 +115,9 @@ class Keithley:
         # Write a single string or a list of strings to the device
         if isinstance(command, str):
             if not self.quiet:
-                print('writing: ' + command.strip("\r"))
-            self.serial.write(command.encode())
+                # print('writing: ' + command.strip("\r"))
+                print(f'writing: {command}')
+            self.serial.write(f'{command}\r'.encode())
         elif isinstance(command, list):
             for cmd in command:
                 self.write(cmd)
@@ -124,7 +125,7 @@ class Keithley:
             raise Exception
 
     def read(self):
-        self.write("READ?\r")
+        self.write("READ?")
         # self.write("*IDN?\r")
         data = self.serial.read_until(b"\r").decode().split(',')
         if not self.quiet:
