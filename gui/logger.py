@@ -93,7 +93,7 @@ class Keithley:
     def read(self):
         # Read data from Keithley and return list of floats representing recorded values
         self.write("READ?")
-        data = self.serial.read_until(b"\n").decode().split(',')
+        data = self.serial.read_until(b"\r").decode().split(',')
         data = list(map(float, data))
         return data
 
