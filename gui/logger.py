@@ -1,12 +1,10 @@
-# import serial
+import serial
 import time
 import datetime
 from pathlib import Path
 import csv
 from gui.loader import Loader
-from PyQt5 import QtCore, QtSerialPort
-from PyQt5.QtCore import QIODevice
-from PyQt5.QtSerialPort import QSerialPort
+from PyQt5 import QtCore
 
 
 class Logger(QtCore.QObject):
@@ -40,33 +38,30 @@ class Keithley:
     """
     Handles serial communication with and initialization of the Keithley2700 multimeter
     """
-    preamble = ["*RST\n",
-                "SYST:PRES\n",
-                "SYST:BEEP OFF\n",
-                "TRAC:CLE\n",
-                "TRAC:CLE:AUTO OFF\n",
-                "INIT:CONT OFF\n",
-                "TRIG:COUN 1\n",
-                "FORM:ELEM READ\n"]
+    preamble = ["*RST",
+                "SYST:PRES",
+                "SYST:BEEP OFF",
+                "TRAC:CLE",
+                "TRAC:CLE:AUTO OFF",
+                "INIT:CONT OFF",
+                "TRIG:COUN 1",
+                "FORM:ELEM READ"]
 
-    def __init__(self, port='COM0', log_freq=30, timeout=15, quiet=True):
+    def __init__(self, port='COM0', log_freq=30, baud_rate=9600, timeout=15, quiet=True):
         self.port = port
         self.log_freq = log_freq
+        self.baud_rate = baud_rate
         self.timeout = timeout
         self.quiet = quiet
         self.serial = None
 
     def __enter__(self):
-        self.serial = QSerialPort()
-        self.serial.setPortName(self.port)
-        self.serial.setBaudRate(QSerialPort.Baud9600)
-        self.serial.open(QIODevice.ReadWrite)
+        self.serial = serial.Serial(self.port, self.baud_rate, timeout=self.timeout)
         print(f'Connected to device at {self.port}')
         for command in self.preamble:
             self.write(command)
             time.sleep(0.5)
-        self.serial.flush()
-        print(f'Keithley initialized')
+        self.serial.flushInput()
         return self
 
     def __exit__(self, *exc_info):
@@ -86,8 +81,8 @@ class Keithley:
         # Write a single string or a list of strings to the device
         if isinstance(command, str):
             if not self.quiet:
-                print('writing: ' + command.strip("\n"))
-            self.serial.write(command.encode())
+                print(f'writing: {command}')
+            self.serial.write(f'{command}\n'.encode())
         elif isinstance(command, list):
             for cmd in command:
                 self.write(cmd)
@@ -96,16 +91,8 @@ class Keithley:
 
     def read(self):
         # Read data from Keithley and return list of floats representing recorded values
-        self.write("READ?\n")
-        # data = self.serial.read_until(b"\n").decode().split(',')
-        data = self.serial.readLine()
-        print(data)
-        data = str(data)
-        print(data)
-        data = data.split(',')
-        print(data)
-        # data = str(self.serial.readLine()).split(',')
-        # print(data)
+        self.write("READ?")
+        data = self.serial.read_until(b"\n").decode().split(',')
         data = list(map(float, data))
         return data
 
@@ -116,14 +103,13 @@ class Keithley:
             print(f'Initialized logical channel {chan.chan_idx:d}: {chan.chan_name} '
                   f'at Keithley port ({chan.hard_port:d})')
         chan_list_str = '(@' + ','.join([str(chan.hard_port) for chan in channels]) + ')'
-        self.write("ROUT:SCAN " + chan_list_str + "\n")
+        self.write(f"ROUT:SCAN {chan_list_str}")
         # The order of the hardware channel listing in chan_list_str in the "ROUT:SCAN..." command determines
         # the order in which the Keithley will read out its data. This ordering derives from the order of channels
         # in channels. Here we memoize that order into a logical channel identification for each channel.
         # This identification is used to correctly assign data output from the Keithley to the appropriate channel.
-
-        self.write(f"SAMP:COUN {len(channels)}\n")
-        self.write("ROUT:SCAN:LSEL INT\n")
+        self.write(f"SAMP:COUN {len(channels)}")
+        self.write("ROUT:SCAN:LSEL INT")
 
     def read_data(self):
         curr_time = datetime.datetime.now()
@@ -141,26 +127,26 @@ class Keithley:
 
     @staticmethod
     def volt_cmds(chan_num):
-        return ["SENS:FUNC 'VOLT',(@" + str(chan_num) + ")\n",
-                "SENS:VOLT:NPLC 5,(@" + str(chan_num) + ")\n",
-                "SENS:VOLT:RANG 5,(@" + str(chan_num) + ")\n"]
+        return [f"SENS:FUNC 'VOLT',(@{chan_num})",
+                f"SENS:VOLT:NPLC 5,(@{chan_num})",
+                f"SENS:VOLT:RANG 5,(@{chan_num})"]
 
     @staticmethod
     def rtd_cmds(chan_num):
-        return ["SENS:FUNC 'TEMP',(@" + str(chan_num) + ")\n",
-                "SENS:TEMP:TRAN FRTD,(@" + str(chan_num) + ")\n",
-                "SENS:TEMP:FRTD:TYPE PT100,(@" + str(chan_num) + ")\n",
-                "SENS:TEMP:NPLC 5,(@" + str(chan_num) + ")\n"]
+        return [f"SENS:FUNC 'TEMP',(@{chan_num})",
+                f"SENS:TEMP:TRAN FRTD,(@{chan_num})",
+                f"SENS:TEMP:FRTD:TYPE PT100,(@{chan_num})",
+                f"SENS:TEMP:NPLC 5,(@{chan_num})"]
 
     @staticmethod
     def thcpl_cmds(chan_num):
-        return ["SENS:FUNC 'TEMP',(@" + str(chan_num) + ")\n",
-                "SENS:TEMP:TRAN TC,(@" + str(chan_num) + ")\n",
-                "SENS:TEMP:TC:TYPE K,(@" + str(chan_num) + ")\n",
-                # "SENS:TEMP:TC:RJUN:RSEL INT,(@" + str(chan_num) + ")\n",
-                "SENS:TEMP:TC:RJUN:RSEL SIM,(@" + str(chan_num) + ")\n",
-                "SENS:TEMP:TC:RJUN:SIM 23,(@" + str(chan_num) + ")\n",
-                "SENS:TEMP:NPLC 5,(@" + str(chan_num) + ")\n"]
+        return [f"SENS:FUNC 'TEMP',(@{chan_num})",
+                f"SENS:TEMP:TRAN TC,(@{chan_num})",
+                f"SENS:TEMP:TC:TYPE K,(@{chan_num})",
+                # f"SENS:TEMP:TC:RJUN:RSEL INT,(@{chan_num})",
+                f"SENS:TEMP:TC:RJUN:RSEL SIM,(@{chan_num})",
+                f"SENS:TEMP:TC:RJUN:SIM 23,(@{chan_num})",
+                f"SENS:TEMP:NPLC 5,(@{chan_num})"]
 
 
 class Channel:
