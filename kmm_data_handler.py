@@ -54,26 +54,26 @@ class Controller:
 
     @staticmethod
     def volt_cmds(chan_num):
-        return ["SENS:FUNC 'VOLT',(@" + str(chan_num) + ")",
-                "SENS:VOLT:NPLC 5,(@" + str(chan_num) + ")",
-                "SENS:VOLT:RANG 5,(@" + str(chan_num) + ")"]
+        return [f"SENS:FUNC 'VOLT',(@{chan_num})",
+                f"SENS:VOLT:NPLC 5,(@{chan_num})",
+                f"SENS:VOLT:RANG 5,(@{chan_num})"]
 
     @staticmethod
     def rtd_cmds(chan_num):
-        return ["SENS:FUNC 'TEMP',(@" + str(chan_num) + ")",
-                "SENS:TEMP:TRAN FRTD,(@" + str(chan_num) + ")",
-                "SENS:TEMP:FRTD:TYPE PT100,(@" + str(chan_num) + ")",
-                "SENS:TEMP:NPLC 5,(@" + str(chan_num) + ")"]
+        return [f"SENS:FUNC 'TEMP',(@{chan_num})",
+                f"SENS:TEMP:TRAN FRTD,(@{chan_num})",
+                f"SENS:TEMP:FRTD:TYPE PT100,(@{chan_num})",
+                f"SENS:TEMP:NPLC 5,(@{chan_num})"]
 
     @staticmethod
     def thcpl_cmds(chan_num):
-        return ["SENS:FUNC 'TEMP',(@" + str(chan_num) + ")",
-                "SENS:TEMP:TRAN TC,(@" + str(chan_num) + ")",
-                "SENS:TEMP:TC:TYPE K,(@" + str(chan_num) + ")",
-                # "SENS:TEMP:TC:RJUN:RSEL INT,(@" + str(chan_num) + ")\r",
-                "SENS:TEMP:TC:RJUN:RSEL SIM,(@" + str(chan_num) + ")",
-                "SENS:TEMP:TC:RJUN:SIM 23,(@" + str(chan_num) + ")",
-                "SENS:TEMP:NPLC 5,(@" + str(chan_num) + ")"]
+        return [f"SENS:FUNC 'TEMP',(@{chan_num})",
+                f"SENS:TEMP:TRAN TC,(@{chan_num})",
+                f"SENS:TEMP:TC:TYPE K,(@{chan_num})",
+                # f"SENS:TEMP:TC:RJUN:RSEL INT,(@{chan_num})",
+                f"SENS:TEMP:TC:RJUN:RSEL SIM,(@{chan_num})",
+                f"SENS:TEMP:TC:RJUN:SIM 23,(@{chan_num})",
+                f"SENS:TEMP:NPLC 5,(@{chan_num})"]
 
 
 class Keithley:
@@ -115,7 +115,6 @@ class Keithley:
         # Write a single string or a list of strings to the device
         if isinstance(command, str):
             if not self.quiet:
-                # print('writing: ' + command.strip("\r"))
                 print(f'writing: {command}')
             self.serial.write(f'{command}\r'.encode())
         elif isinstance(command, list):
@@ -126,7 +125,7 @@ class Keithley:
 
     def read(self):
         self.write("READ?")
-        # self.write("*IDN?\r")
+        # self.write("*IDN?")
         data = self.serial.read_until(b"\r").decode().split(',')
         if not self.quiet:
             print(data)
@@ -181,17 +180,17 @@ class SaveGroup:
         file_name = f'{self.log_drive}{self.group_name} {date_str}.csv'
         try:
             with open(file_name, 'a') as file:
-                file.write(data_str + '\r')
+                file.write(f'{data_str}\n')
                 if not self.quiet:
-                    print('wrote ' + data_str + ' to ' + file_name)
+                    print(f'wrote {data_str} to {file_name}')
         except OSError:
             err_str = f'IO error while attempting to write data to {file_name}'
             print(err_str)
             error_file = f'{self.error_drive}Error - {self.group_name} {date_str}.csv'
             try:
                 with open(error_file, 'a') as file:
-                    file.write(data_str + '\r')
-                    file.write(err_str)
+                    file.write(f'{data_str}\n')
+                    file.write(f'{err_str}\n')
             except OSError:
                 print(f'Error while logging earlier error data.')
 
@@ -199,9 +198,9 @@ class SaveGroup:
         backup_file_name = f'{self.backup_drive}{self.group_name} {date_str}.csv'
         try:
             with open(backup_file_name, 'a') as file:
-                file.write(data_str + '\r')
+                file.write(f'{data_str}\n')
                 if not self.quiet:
-                    print('wrote ' + data_str + ' to ' + backup_file_name)
+                    print(f'wrote {data_str} to {backup_file_name}')
         except OSError:
             print('Warning, IO error while attempting to write to backup drive: {self.backup_drive}')
             # print("Ok, even backup log directory is having trouble. Shit has gone to hell! Abandon ship!")
@@ -216,7 +215,7 @@ class Loader:
         self.group_name = self.save_group.group_name
         self.log_drive = self.save_group.log_drive
         self.date_format = self.save_group.date_format
-        self.datetime_format = self.save_group.date_format + ' ' + self.save_group.time_format
+        self.datetime_format = f'{self.save_group.date_format} {self.save_group.time_format}'
 
         self.chan_columns = [chan.chan_name for chan in self.save_group.channels]
         self.read_columns = ['date', 'time'] + self.chan_columns
