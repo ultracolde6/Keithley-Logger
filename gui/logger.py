@@ -54,8 +54,9 @@ class Keithley:
         self.timeout = timeout
         self.quiet = quiet
         self.serial = None
+        self.initialize_device()
 
-    def __enter__(self):
+    def initialize_device(self):
         self.serial = serial.Serial(self.port, self.baud_rate, timeout=self.timeout)
         print(f'Connected to device at {self.port}')
         for command in self.preamble:
@@ -64,18 +65,18 @@ class Keithley:
         self.serial.flushInput()
         return self
 
-    def __exit__(self, *exc_info):
-        try:
-            close_it = self.serial.close
-            print('Closing serial connection with Keithley')
-        except AttributeError as er:
-            print('Exception during serial closing:')
-            print(er)
-            # TODO check what this might be catching?
-            pass
-        else:
-            close_it()
-            print(f'Closed connect at {self.port}')
+    # def __exit__(self, *exc_info):
+    #     try:
+    #         close_it = self.serial.close
+    #         print('Closing serial connection with Keithley')
+    #     except AttributeError as er:
+    #         print('Exception during serial closing:')
+    #         print(er)
+    #         # TODO check what this might be catching?
+    #         pass
+    #     else:
+    #         close_it()
+    #         print(f'Closed connect at {self.port}')
 
     def write(self, command):
         # Write a single string or a list of strings to the device

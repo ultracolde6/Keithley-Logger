@@ -3,6 +3,7 @@ import time
 import threading
 import gui.logger as logger
 from pathlib import Path
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 
 def logger_routine(keithley_device, save_groups, t_read_freq):
@@ -91,9 +92,12 @@ def main():
 
     controller = logger.Logger(save_groups=save_groups, device=kmm, log_freq=t_read_freq)
 
-    logger_thread = threading.Thread(target=logger_routine, args=(controller, save_groups, t_read_freq))
-    logger_thread.start()
+    # logger_thread = threading.Thread(target=logger_routine, args=(controller, save_groups, t_read_freq))
+    # logger_thread.start()
 
 
 if __name__ == '__main__':
+    import sys
+    app = QtWidgets.QApplication(sys.argv)
     main()
+    sys.exit(app.exec_())
