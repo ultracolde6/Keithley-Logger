@@ -1,6 +1,5 @@
 import pandas as pd
 import datetime
-import time
 from pathlib import Path
 import csv
 
@@ -42,17 +41,19 @@ class Loader:
     #     self.data = self.data.loc[time_mask]
 
     def grab_dates(self, start_date, stop_date):
-        # grab_dates parses through the data log and returns a pandas data frame containing all of the data
-        # for the days within start_date to stop_date.
+        """
+        grab_dates parses through the data log and returns a pandas data frame containing all of the data
+        for the days within start_date to stop_date.
+        """
         if isinstance(start_date, datetime.datetime):
             start_date = start_date.date()
-        if isinstance(start_date, datetime.datetime):
-            start_date = start_date.date()
+        if isinstance(stop_date, datetime.datetime):
+            stop_date = stop_date.date()
 
         if not self.quiet:
             print(f'Grabbing data for dates '
                   f'{start_date.strftime(self.date_format)} through {stop_date.strftime(self.date_format)}')
-        t0 = time.time()
+        t0 = datetime.datetime.now()
         data = pd.DataFrame()
         date_range = [dt.date() for dt in pd.date_range(start_date, stop_date).to_pydatetime()]
         for date in date_range:
@@ -70,11 +71,12 @@ class Loader:
             except FileNotFoundError:
                 print(f'File not found: {file_path}')
         if not self.quiet:
-            tf = time.time()
+            tf = datetime.datetime.now()
+            dt = (tf-t0).total_seconds()
             print(f'Grabbed data for dates '
                   f'{start_date.strftime(self.date_format)} through '
                   f'{stop_date.strftime(self.date_format)}')
-            print(f'Grabbing took {(tf-t0):.3f} s')
+            print(f'Grabbing took {dt:.3f} s')
         return data
 
     def refresh_data(self, start_datetime):
@@ -87,7 +89,7 @@ class Loader:
             print(f'Refreshing data from '
                   f'{start_datetime.strftime(self.datetime_format)} through '
                   f'{stop_datetime.strftime(self.datetime_format)}')
-        t0 = time.time()
+        t0 = datetime.datetime.now()
 
         if not self.data_loaded or start_date < self.loaded_start_date:
             # hard reset on data required if data not loaded or start date is earlier than self.loaded_start_date
@@ -140,11 +142,12 @@ class Loader:
         #                            np.array(self.data.index < stop_datetime))
         # self.data = self.data.loc[time_mask]
         if not self.quiet:
-            tf = time.time()
+            tf = datetime.datetime.now()
+            dt = (tf-t0).total_seconds()
             print(f'Data refreshed to include dates '
                   f'{start_date.strftime(self.date_format)} through '
                   f'{stop_date.strftime(self.date_format)}')
-            print(f'Refreshing took {(tf - t0):.3f} s')
+            print(f'Refreshing took {dt:.3f} s')
         return self.data
 
     def get_header(self):

@@ -4,6 +4,7 @@ from PyQt5.QtCore import QThread, pyqtSignal
 from ui_plotwindow import Ui_PlotWindow
 import pandas as pd
 import numpy as np
+from pathlib import Path
 
 
 class PlotWorker(QtCore.QObject):
@@ -20,12 +21,15 @@ class PlotWorker(QtCore.QObject):
     def run_configure_axes(self):
         self.plot_window.configure_axes()
 
+    def save(self):
+        self.plot_window.save_plot()
+
 
 class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
     update_signal = pyqtSignal()
     reconfigure_plot_signal = pyqtSignal()
 
-    def __init__(self, loader, ylabel='Signal Level'):
+    def __init__(self, loader, ylabel='Signal Level', units_label='(a.u.)'):
         super(PlotWindow, self).__init__()
         self.loader = loader
         self.setupUi(self)
@@ -34,10 +38,13 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.figure = self.canvas.figure
         self.axes = None
         self.ylabel = ylabel
+        self.units_label = units_label
         self.plot_worker = PlotWorker(self)
 
         self.data_fields = self.loader.get_header()[2:]
         self.n_data_fields = len(self.data_fields)
+        if self.n_data_fields == 1:
+            self.multi_plot_radioButton.setEnabled(False)
 
         self.autoscale = None
         self.outlier_reject = None
@@ -72,10 +79,13 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.show()
         self.refresh_timer.start(self.refresh_time)
 
+        self.save_timer = QtCore.QTimer(self)
+        self.save_timer.timeout.connect(self.plot_worker.save)
+        self.save_timer.start(int(10e3))
+
     def configure_axes(self):
         self.figure.clear()
         axes = []
-
         if self.plot_mode == 'singleplot':
             axes = self.configure_singleplot_axes()
         elif self.plot_mode == 'multiplot':
@@ -103,6 +113,7 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
             self.single_plot()
         elif self.plot_mode == 'multiplot':
             self.multi_plot()
+        self.canvas.draw()
         self.updating = False
 
     def single_plot(self):
@@ -115,10 +126,11 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         except TypeError:
             print('No Data to plot')
         self.axis_scalings()
+        ax.set_ylabel(f'{self.ylabel} {self.units_label}')
+        ax.set_xlabel('Time')
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        self.canvas.draw()
+        ax.legend(loc='lower left')
 
     def multi_plot(self):
         for n, field in enumerate(self.data_fields):
@@ -131,7 +143,8 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
             except TypeError:
                 print('No Data to plot')
             self.axis_scalings()
-            self.canvas.draw()
+            ax.set_ylabel(f'{field} {self.units_label}')
+            ax.set_xlabel('Time')
 
     def clip_data(self, data):
         time_mask = np.logical_and(self.start_datetime < data.index,
@@ -140,7 +153,7 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         if self.outlier_reject:
             clipped_data_std = np.std(clipped_data)
             clipped_data_mean = np.mean(clipped_data)
-            clipped_zscore = (data - clipped_data_mean) / clipped_data_std
+            clipped_zscore = (clipped_data - clipped_data_mean) / clipped_data_std
             clipped_data = clipped_data[np.abs(clipped_zscore) < self.outlier_reject_level]
         return clipped_data
 
@@ -157,8 +170,6 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
             if not self.autoscale:
                 ax.set_ylim(self.ymin, self.ymax)
             ax.set_yscale(self.yscale)
-            ax.set_ylabel(self.ylabel)
-            ax.set_xlabel('Time')
             ax.set_xlim(self.start_datetime, self.stop_datetime)
 
     def update(self):
@@ -284,3 +295,7 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.refresh_timer.start(self.refresh_time)
         self.pause_pushButton.setText('Pause')
         self.paused = False
+
+    def save_plot(self):
+        savefig_path = Path('C:/', 'Users', 'Justin', 'Desktop', f'{self.loader.file_prefix}.png')
+        self.figure.savefig(savefig_path)
