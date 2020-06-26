@@ -19,12 +19,13 @@ class Logger(QtCore.QObject):
             for channel in save_group.channels:
                 self.channels.append(channel)  # Add all of the channels in all of the save_groups into self.channels
         self.device = device
+        self.device.init_measurement(self.channels)
         self.log_freq = log_freq
         self.quiet = quiet
 
         self.data_timer = QtCore.QTimer(self)
         self.data_timer.timeout.connect(self.log_data)
-        self.data_timer.start(self.log_freq)
+        self.data_timer.start(self.log_freq*1e3)
 
     def log_data(self):
         curr_time, data = self.device.read_data()
@@ -94,6 +95,7 @@ class Keithley:
         # Read data from Keithley and return list of floats representing recorded values
         self.write("READ?")
         data = self.serial.read_until(b"\r").decode().split(',')
+        print(data)
         data = list(map(float, data))
         return data
 

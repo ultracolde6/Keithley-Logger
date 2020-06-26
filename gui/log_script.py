@@ -35,7 +35,7 @@ def main():
 
     kmm_port = 'COM6'  # Port for Keithley multimeter (kmm)
 
-    t_read_freq = 30  # How often to query Keithley multimeter for new data
+    t_read_freq = 15  # How often to query Keithley multimeter for new data
     # t_plot_freq = datetime.timedelta(seconds=10)  # How often to produce new plots
     # t_plot_history = datetime.timedelta(hours=12)  # How far back in history the plots should reach
 
