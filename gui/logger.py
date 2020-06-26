@@ -3,7 +3,6 @@ import time
 import datetime
 from pathlib import Path
 import csv
-from gui.loader import Loader
 from PyQt5 import QtCore
 
 
@@ -11,28 +10,46 @@ class Logger(QtCore.QObject):
     """
     Configure data acquisition, process/organize data as it comes in, and control visualization of data
     """
-    def __init__(self, save_groups, device, log_freq, quiet=False):
+    def __init__(self, save_groups, device, log_freq, quiet=True):
         super(Logger, self).__init__()
         self.save_groups = save_groups
         self.channels = []
         for save_group in self.save_groups:
             for channel in save_group.channels:
                 self.channels.append(channel)  # Add all of the channels in all of the save_groups into self.channels
+
         self.device = device
         self.device.init_measurement(self.channels)
-        self.log_freq = log_freq
+
         self.quiet = quiet
 
+        self.log_data()  # Log data immediately before starting timer
+
+        self.log_freq = log_freq
         self.data_timer = QtCore.QTimer(self)
         self.data_timer.timeout.connect(self.log_data)
         self.data_timer.start(self.log_freq*1e3)
 
     def log_data(self):
-        curr_time, data = self.device.read_data()
+        curr_time, data = self.read_data()
         for chan in self.channels:
             chan.curr_data = chan.conv_func(data[chan.chan_idx])  # Consider saving raw data instead of converted data
         for save_group in self.save_groups:
             save_group.save_data(curr_time)
+
+    def read_data(self):
+        curr_time = datetime.datetime.now()
+        date_time_string = curr_time.strftime('%Y-%m-%d %H:%M:%S')
+        data = self.device.read()
+        try:
+            if not self.quiet:
+                print(date_time_string + " raw data: " + ", ".join([f"{datum:.3f}" for datum in data]))
+        except ValueError:
+            if data == ["b''"]:
+                print(date_time_string + ": Error: Received nothing from Keithley")
+            else:
+                print(date_time_string + f": Error: Received {data} from Keithley")
+        return curr_time, data
 
 
 class Keithley:
@@ -48,36 +65,18 @@ class Keithley:
                 "TRIG:COUN 1",
                 "FORM:ELEM READ"]
 
-    def __init__(self, port='COM0', log_freq=30, baud_rate=9600, timeout=15, quiet=True):
+    def __init__(self, port='COM0', baud_rate=9600, timeout=15, quiet=True):
         self.port = port
-        self.log_freq = log_freq
         self.baud_rate = baud_rate
         self.timeout = timeout
         self.quiet = quiet
-        self.serial = None
-        self.initialize_device()
 
-    def initialize_device(self):
         self.serial = serial.Serial(self.port, self.baud_rate, timeout=self.timeout)
         print(f'Connected to device at {self.port}')
         for command in self.preamble:
             self.write(command)
-            time.sleep(0.5)
+            time.sleep(0.25)
         self.serial.flushInput()
-        return self
-
-    # def __exit__(self, *exc_info):
-    #     try:
-    #         close_it = self.serial.close
-    #         print('Closing serial connection with Keithley')
-    #     except AttributeError as er:
-    #         print('Exception during serial closing:')
-    #         print(er)
-    #         # TODO check what this might be catching?
-    #         pass
-    #     else:
-    #         close_it()
-    #         print(f'Closed connect at {self.port}')
 
     def write(self, command):
         # Write a single string or a list of strings to the device
@@ -95,11 +94,20 @@ class Keithley:
         # Read data from Keithley and return list of floats representing recorded values
         self.write("READ?")
         data = self.serial.read_until(b"\r").decode().split(',')
-        print(data)
         data = list(map(float, data))
         return data
 
     def init_measurement(self, channels):
+        """
+        The main purpose of this method is to initialize the Keithley to scan the appropriate hardware ports
+        specified in chan.chan_name for each channel in input parameter channels. This is done by the 3 self.write()
+        calls at the end of this method.
+        Importantly, the order in which the hardware channels appear in the chan_list_str coincides with the order
+        in which the Keithley will read out the hardware channels. The enumeration of each channel in chan_list_str
+        is saved in the channel.chan_idx attribute for each channel.
+        This enumeration will be recalled when the Logger object parses the data from the Keithley readout in the
+        Logger.log_data() method.
+        """
         for idx, chan in enumerate(channels):
             chan.chan_idx = idx
             self.write(chan.init_cmds)
@@ -107,49 +115,31 @@ class Keithley:
                   f'at Keithley port ({chan.hard_port:d})')
         chan_list_str = '(@' + ','.join([str(chan.hard_port) for chan in channels]) + ')'
         self.write(f"ROUT:SCAN {chan_list_str}")
-        # The order of the hardware channel listing in chan_list_str in the "ROUT:SCAN..." command determines
-        # the order in which the Keithley will read out its data. This ordering derives from the order of channels
-        # in channels. Here we memoize that order into a logical channel identification for each channel.
-        # This identification is used to correctly assign data output from the Keithley to the appropriate channel.
         self.write(f"SAMP:COUN {len(channels)}")
         self.write("ROUT:SCAN:LSEL INT")
 
-    def read_data(self):
-        curr_time = datetime.datetime.now()
-        date_time_string = curr_time.strftime('%Y-%m-%d %H:%M:%S')
-        data = self.read()
-        try:
-            if not self.quiet:
-                print(date_time_string + " raw data: " + ", ".join([f"{datum:.3f}" for datum in data]))
-        except ValueError:
-            if data == ["b''"]:
-                print(date_time_string + ": Error: Received nothing from Keithley")
-            else:
-                print(date_time_string + f": Error: Received {data} from Keithley")
-        return curr_time, data
+    @staticmethod
+    def volt_cmds(hard_port):
+        return [f"SENS:FUNC 'VOLT',(@{hard_port})",
+                f"SENS:VOLT:NPLC 5,(@{hard_port})",
+                f"SENS:VOLT:RANG 5,(@{hard_port})"]
 
     @staticmethod
-    def volt_cmds(chan_num):
-        return [f"SENS:FUNC 'VOLT',(@{chan_num})",
-                f"SENS:VOLT:NPLC 5,(@{chan_num})",
-                f"SENS:VOLT:RANG 5,(@{chan_num})"]
+    def rtd_cmds(hard_port):
+        return [f"SENS:FUNC 'TEMP',(@{hard_port})",
+                f"SENS:TEMP:TRAN FRTD,(@{hard_port})",
+                f"SENS:TEMP:FRTD:TYPE PT100,(@{hard_port})",
+                f"SENS:TEMP:NPLC 5,(@{hard_port})"]
 
     @staticmethod
-    def rtd_cmds(chan_num):
-        return [f"SENS:FUNC 'TEMP',(@{chan_num})",
-                f"SENS:TEMP:TRAN FRTD,(@{chan_num})",
-                f"SENS:TEMP:FRTD:TYPE PT100,(@{chan_num})",
-                f"SENS:TEMP:NPLC 5,(@{chan_num})"]
-
-    @staticmethod
-    def thcpl_cmds(chan_num):
-        return [f"SENS:FUNC 'TEMP',(@{chan_num})",
-                f"SENS:TEMP:TRAN TC,(@{chan_num})",
-                f"SENS:TEMP:TC:TYPE K,(@{chan_num})",
-                # f"SENS:TEMP:TC:RJUN:RSEL INT,(@{chan_num})",
-                f"SENS:TEMP:TC:RJUN:RSEL SIM,(@{chan_num})",
-                f"SENS:TEMP:TC:RJUN:SIM 23,(@{chan_num})",
-                f"SENS:TEMP:NPLC 5,(@{chan_num})"]
+    def thcpl_cmds(hard_port):
+        return [f"SENS:FUNC 'TEMP',(@{hard_port})",
+                f"SENS:TEMP:TRAN TC,(@{hard_port})",
+                f"SENS:TEMP:TC:TYPE K,(@{hard_port})",
+                # f"SENS:TEMP:TC:RJUN:RSEL INT,(@{hard_port})",
+                f"SENS:TEMP:TC:RJUN:RSEL SIM,(@{hard_port})",
+                f"SENS:TEMP:TC:RJUN:SIM 23,(@{hard_port})",
+                f"SENS:TEMP:NPLC 5,(@{hard_port})"]
 
 
 class Channel:
@@ -159,7 +149,7 @@ class Channel:
     def __init__(self, hard_port=101, chan_idx=0, chan_name="Voltage",
                  conv_func=lambda x: x, init_cmds_template=Keithley.volt_cmds):
         self.hard_port = hard_port
-        self.chan_idx = chan_idx  # chan_idx will be configured by the controller upon initialization
+        self.chan_idx = chan_idx  # chan_idx will be configured by the Logger and Keithley objects upon initialization
         self.chan_name = chan_name
         self.conv_func = conv_func
         self.init_cmds = init_cmds_template(hard_port)
@@ -172,10 +162,10 @@ class SaveGroup:
     """
     def __init__(self, channels, group_name='DataGroup',
                  log_drive=None, backup_drive=None, error_drive=None, webplot_drive=None,
-                 date_format='%Y-%m-%d', time_format='%H:%M:%S', data_label='Signal Level', quiet=True):
-        if not isinstance(channels, list):
-            channels = [channels]
+                 date_format='%Y-%m-%d', time_format='%H:%M:%S', quiet=True):
         self.channels = channels
+        if not isinstance(self.channels, list):
+            self.channels = [self.channels]
         self.group_name = group_name
         self.log_drive = log_drive
         self.backup_drive = backup_drive
@@ -183,20 +173,15 @@ class SaveGroup:
         self.webplot_drive = webplot_drive
         self.date_format = date_format
         self.time_format = time_format
-        self.loader = Loader(log_drive, group_name, date_format, time_format)
-        self.data_label = data_label
-        # self.plotwindow = PlotWindow(self.loader, ylabel=self.data_label)
-        # TODO: savegroup shouldn't contain the plotter, this should be seperate
         self.quiet = quiet
 
     def save_data(self, time_stamp):
         data = dict()
         data['date'] = time_stamp.strftime(self.date_format)
         data['time'] = time_stamp.strftime(self.time_format)
+        # Legacy format for saving the data. Would make sense to save datetime string in one cell.
         for chan in self.channels:
             data[chan.chan_name] = f'{chan.curr_data:f}'
-
-        # Legacy format for saving the data. Would make sense to save datetime string in one cell.
 
         file_name = f'{self.group_name} {data["date"]}.csv'
         file_path = Path(self.log_drive, file_name)
@@ -232,7 +217,7 @@ def write_to_csv(file_path, data_dict, quiet=True):
     else:
         fieldnames = keys
     file_path.parent.mkdir(exist_ok=True)
-    with file_path.open('a', newline='') as file:
+    with file_path.open('a') as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         if not file_exists:
             writer.writeheader()
@@ -242,7 +227,8 @@ def write_to_csv(file_path, data_dict, quiet=True):
 
 
 def get_csv_header(file_path):
-    with open(file_path, 'r', newline='') as file:
+    # Returns the first line of a .csv file to be interpreted as the header.
+    with open(file_path, 'r') as file:
         reader = csv.reader(file)
         header = next(reader)
     return header

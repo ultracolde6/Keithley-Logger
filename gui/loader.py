@@ -78,6 +78,7 @@ class Loader:
         return data
 
     def refresh_data(self, start_datetime):
+        # TODO: Trim self.data to prevent excess memory usage
         start_date = start_datetime.date()
         stop_datetime = datetime.datetime.now()
         stop_date = stop_datetime.date()
