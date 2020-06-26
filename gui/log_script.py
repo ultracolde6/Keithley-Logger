@@ -26,6 +26,8 @@ def logger_routine(keithley_device, save_groups, t_read_freq):
 
 
 def main():
+    import sys
+    app = QtWidgets.QApplication(sys.argv)
     log_drive = Path('Y:/', 'smalldata-e6', 'KeithleyLogger Data')
     backup_drive = Path('C:/', 'KeithleyLoggerBackup')
     error_drive = Path('C:/', 'KeithleyLoggerBackup,' 'Error')
@@ -94,10 +96,7 @@ def main():
 
     # logger_thread = threading.Thread(target=logger_routine, args=(controller, save_groups, t_read_freq))
     # logger_thread.start()
-
+    sys.exit(app.exec_())
 
 if __name__ == '__main__':
-    import sys
-    app = QtWidgets.QApplication(sys.argv)
     main()
-    sys.exit(app.exec_())
