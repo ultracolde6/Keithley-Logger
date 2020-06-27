@@ -119,9 +119,10 @@ class Loader:
             self.loaded_stop_date = date
             self.data_loaded = True
 
-        time_mask = np.logical_and(np.array(start_datetime < self.data.index),
-                                   np.array(self.data.index < stop_datetime))
+        time_mask = np.logical_and(np.array(start_datetime <= self.data.index),
+                                   np.array(self.data.index <= stop_datetime))
         self.data = self.data.loc[time_mask]
+        self.loaded_start_date = start_datetime.date()
         if not self.quiet:
             tf = datetime.datetime.now()
             dt = (tf-t0).total_seconds()

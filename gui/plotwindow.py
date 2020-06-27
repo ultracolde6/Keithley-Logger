@@ -117,13 +117,14 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
             self.single_plot()
         elif self.plot_mode == 'multiplot':
             self.multi_plot()
+        self.figure.set_tight_layout(True)
         self.canvas.draw()
         self.updating = False
 
     def single_plot(self):
         plot_data = self.data[self.data_fields]
         plot_data = self.clip_data(plot_data)
-        plot_data = plot_data.apply(self.conv_func, axis=0)
+        plot_data = plot_data.apply(self.conv_func)
         ax = self.axes[0]
         ax.clear()
         try:
@@ -141,7 +142,7 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         for n, field in enumerate(self.data_fields):
             plot_data = self.data[field]
             plot_data = self.clip_data(plot_data)
-            plot_data = plot_data.apply(self.conv_func, axis=0)
+            plot_data = plot_data.apply(self.conv_func)
             ax = self.axes[n]
             ax.clear()
             try:
