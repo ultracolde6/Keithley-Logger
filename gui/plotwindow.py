@@ -29,7 +29,7 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
     update_signal = pyqtSignal()
     reconfigure_plot_signal = pyqtSignal()
 
-    def __init__(self, loader, ylabel='Signal Level', units_label='(a.u.)', save_path=None):
+    def __init__(self, loader, ylabel='Signal Level', units_label='(a.u.)', save_path=None, conv_func=(lambda x: x)):
         super(PlotWindow, self).__init__()
         self.loader = loader
         self.setupUi(self)
@@ -40,6 +40,7 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.ylabel = ylabel
         self.units_label = units_label
         self.save_path = save_path
+        self.conv_func = conv_func
         if self.save_path is None:
             self.save_path = self.loader.log_drive
         self.plot_worker = PlotWorker(self)
@@ -122,6 +123,7 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
     def single_plot(self):
         plot_data = self.data[self.data_fields]
         plot_data = self.clip_data(plot_data)
+        plot_data = plot_data.apply(self.conv_func, axis=0)
         ax = self.axes[0]
         ax.clear()
         try:
@@ -139,6 +141,7 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         for n, field in enumerate(self.data_fields):
             plot_data = self.data[field]
             plot_data = self.clip_data(plot_data)
+            plot_data = plot_data.apply(self.conv_func, axis=0)
             ax = self.axes[n]
             ax.clear()
             try:

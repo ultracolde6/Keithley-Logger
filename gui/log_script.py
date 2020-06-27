@@ -64,9 +64,12 @@ save_groups = [mag_group, ion_pump_group, ion_gauge_group]
 keithley_device = logger.Keithley(port=keithley_port, timeout=15, quiet=False)
 controller = logger.Logger(save_groups=save_groups, device=keithley_device, log_freq=t_read_freq, quiet=False)
 
-mag_plotter = PlotWindow(Loader(Path(log_drive, 'MagField'), 'MagField', quiet=True), save_path=webplot_drive)
-ion_pump_plotter = PlotWindow(Loader(Path(log_drive, 'IonPump'), 'IonPump', quiet=True), save_path=webplot_drive)
-ion_gauge_plotter = PlotWindow(Loader(Path(log_drive, 'IonGauge'), 'IonGauge', quiet=True), save_path=webplot_drive)
+mag_plotter = PlotWindow(Loader(Path(log_drive, 'MagField'), 'MagField', quiet=True),
+                         save_path=webplot_drive)
+ion_pump_plotter = PlotWindow(Loader(Path(log_drive, 'IonPump'), 'IonPump', quiet=True),
+                              save_path=webplot_drive, conv_func=(lambda x: 10**x))
+ion_gauge_plotter = PlotWindow(Loader(Path(log_drive, 'IonGauge'), 'IonGauge', quiet=True),
+                               save_path=webplot_drive, conv_func=(lambda x: 10**x))
 
 plotters = [mag_plotter, ion_pump_plotter, ion_gauge_plotter]
 for plotter in plotters:
