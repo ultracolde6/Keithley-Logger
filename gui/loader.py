@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import datetime
 from pathlib import Path
@@ -20,25 +21,6 @@ class Loader:
         self.loaded_start_date = None
         self.loaded_stop_date = None
         self.lines_loaded = 0
-
-    # def load_dates(self, start_date, stop_date):
-    #     # Loads all of the data since start_date into self.data. Note that self.data is overwritten when this method
-    #     # is called.
-    #     self.data = self.grab_dates(start_date, stop_date)
-    #     self.data_loaded = True
-    #     self.loaded_start_date = start_date
-    #     self.loaded_stop_date = stop_date
-    #
-    # def trim_data(self, start_datetime, stop_datetime):
-    #     start_date = start_datetime.date()
-    #     stop_date = stop_datetime.date()
-    #     if start_date != self.loaded_start_date or stop_date != self.loaded_stop_date:
-    #         print('Cannot trim data if input date range is outside of loaded date range.'
-    #               'performing hard resest on loaded data')
-    #         self.load_dates(start_date, stop_date)
-    #     time_mask = np.logical_and(np.array(start_datetime < self.data.index),
-    #                                np.array(self.data.index < stop_datetime))
-    #     self.data = self.data.loc[time_mask]
 
     def grab_dates(self, start_date, stop_date):
         """
@@ -93,7 +75,6 @@ class Loader:
 
         if not self.data_loaded or start_date < self.loaded_start_date:
             # hard reset on data required if data not loaded or start date is earlier than self.loaded_start_date
-            # self.load_dates(start_date, stop_date)
             self.data = pd.DataFrame()
             self.loaded_start_date = None
             self.loaded_stop_date = None
@@ -138,9 +119,9 @@ class Loader:
             self.loaded_stop_date = date
             self.data_loaded = True
 
-        # time_mask = np.logical_and(np.array(start_datetime < self.data.index),
-        #                            np.array(self.data.index < stop_datetime))
-        # self.data = self.data.loc[time_mask]
+        time_mask = np.logical_and(np.array(start_datetime < self.data.index),
+                                   np.array(self.data.index < stop_datetime))
+        self.data = self.data.loc[time_mask]
         if not self.quiet:
             tf = datetime.datetime.now()
             dt = (tf-t0).total_seconds()
