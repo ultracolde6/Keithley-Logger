@@ -66,7 +66,7 @@ class Loader:
                                        parse_dates={'datetime': ['date', 'time']},
                                        index_col='datetime',
                                        infer_datetime_format=True)
-                new_data.index = pd.to_datetime(new_data.index)  # , format=self.datetime_format)
+                new_data.index = pd.to_datetime(new_data.index, format=self.datetime_format)
                 data = data.append(new_data)
             except FileNotFoundError:
                 print(f'File not found: {file_path}')
@@ -125,7 +125,7 @@ class Loader:
                                        # parse_dates={'datetime': [0, 1]},
                                        index_col='datetime',
                                        infer_datetime_format=True)
-                new_data.index = pd.to_datetime(new_data.index)
+                new_data.index = pd.to_datetime(new_data.index, format=self.datetime_format)
                 new_row_count = new_data.shape[0]
                 if new_row_count > 0:
                     self.data = self.data.append(new_data)

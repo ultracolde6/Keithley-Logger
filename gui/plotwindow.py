@@ -29,7 +29,7 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
     update_signal = pyqtSignal()
     reconfigure_plot_signal = pyqtSignal()
 
-    def __init__(self, loader, ylabel='Signal Level', units_label='(a.u.)'):
+    def __init__(self, loader, ylabel='Signal Level', units_label='(a.u.)', save_path=None):
         super(PlotWindow, self).__init__()
         self.loader = loader
         self.setupUi(self)
@@ -39,6 +39,9 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.axes = None
         self.ylabel = ylabel
         self.units_label = units_label
+        self.save_path = save_path
+        if self.save_path is None:
+            self.save_path = self.loader.log_drive
         self.plot_worker = PlotWorker(self)
 
         self.data_fields = self.loader.get_header()[2:]
@@ -297,5 +300,8 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.paused = False
 
     def save_plot(self):
-        savefig_path = Path('C:/', 'Users', 'Justin', 'Desktop', f'{self.loader.file_prefix}.png')
-        self.figure.savefig(savefig_path)
+        save_file = Path(self.save_path, f'{self.loader.file_prefix}.png')
+        try:
+            self.figure.savefig(save_file)
+        except OSError:
+            print(f'Warning, OSError while attempting to save figure to {save_file}')
