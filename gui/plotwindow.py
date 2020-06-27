@@ -55,9 +55,9 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.outlier_reject = None
         self.yscale = yscale
         if self.yscale == 'lin':
-            self.lin_radioButton.setChecked()
+            self.lin_radioButton.setChecked(True)
         elif self.yscale == 'log':
-            self.log_radioButton.setChecked()
+            self.log_radioButton.setChecked(True)
         else:
             raise ValueError(f'Unexpected input string for yscale: {self.yscale}')
         self.ymin = None
@@ -72,9 +72,9 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.outlier_reject_level = 2
         self.plot_mode = plot_mode
         if self.plot_mode == 'singleplot':
-            self.single_plot_radioButton.setChecked()
+            self.single_plot_radioButton.setChecked(True)
         elif self.plot_mode == 'multiplot':
-            self.multi_plot_radioButton.setChecked()
+            self.multi_plot_radioButton.setChecked(True)
         else:
             raise ValueError(f'Unexpected input string for plot_mode: {self.plot_mode}')
 
