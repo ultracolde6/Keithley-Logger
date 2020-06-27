@@ -309,3 +309,41 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
             self.figure.savefig(save_file)
         except OSError:
             print(f'Warning, OSError while attempting to save figure to {save_file}')
+
+
+class IonPumpPlotWindow(PlotWindow):
+    def __init__(self, *args, **kwargs):
+        super(IonPumpPlotWindow, self).__init__(*args, **kwargs)
+
+    def configure_singleplot_axes(self):
+        ax = self.figure.add_subplot(1, 1, 1)
+        ax2 = ax.twinx()
+        axes = [ax, ax2]
+        return axes
+
+    def single_plot(self):
+        plot_data = self.data[self.data_fields]
+        plot_data = self.clip_data(plot_data)
+        plot_data = plot_data.apply(self.conv_func)
+        ax = self.axes[0]
+        ax.clear()
+        try:
+            plot_data.plot(ax=ax, style='.')
+        except TypeError:
+            print('No Data to plot')
+        self.axis_scalings()
+        ax.set_ylabel(f'{self.ylabel} {self.units_label}')
+        ax.set_xlabel('Time')
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        ax.legend(loc='lower left')
+
+        ax2 = self.axes[1]
+        ymin, ymax = ax.get_ylim()
+        ax2.set_ylim(self.curr2press(ymin), self.curr2press(ymax))
+        ax2.set_ylabel('Pressure (torr)')
+
+    @staticmethod
+    def curr2press(curr):
+        # formula given in ion pump controller to convert current (expressed in nA) to pressure (in torr)
+        return 0.066 * curr * 10 ** -9 * 5600 / 7000 / 70

@@ -1,7 +1,7 @@
 import gui.logger as logger
 from pathlib import Path
 from PyQt5 import QtWidgets
-from plotwindow import PlotWindow
+from plotwindow import PlotWindow, IonPumpPlotWindow
 from loader import Loader
 import sys
 
@@ -66,9 +66,9 @@ controller = logger.Logger(save_groups=save_groups, device=keithley_device, log_
 
 mag_plotter = PlotWindow(Loader(Path(log_drive, 'MagField'), 'MagField', quiet=True),
                          save_path=webplot_drive, ylabel='Magnetic Field', units_label='(mG)')
-ion_pump_plotter = PlotWindow(Loader(Path(log_drive, 'IonPump'), 'IonPump', quiet=True),
-                              save_path=webplot_drive, conv_func=(lambda x: 10**x*1e9),
-                              ylabel='Ion Pump Current', units_label='(nA)')
+ion_pump_plotter = IonPumpPlotWindow(Loader(Path(log_drive, 'IonPump'), 'IonPump', quiet=True),
+                                     save_path=webplot_drive, conv_func=(lambda x: 10**x*1e9),
+                                     ylabel='Ion Pump Current', units_label='(nA)')
 ion_gauge_plotter = PlotWindow(Loader(Path(log_drive, 'IonGauge'), 'IonGauge', quiet=True),
                                save_path=webplot_drive, conv_func=(lambda x: 10**x),
                                ylabel='Ion Gauge Pressure', units_label='(torr)')
