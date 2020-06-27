@@ -48,6 +48,8 @@ class PlotterManagerWindow(QtWidgets.QMainWindow):
 
         self.retranslateui()
         QtCore.QMetaObject.connectSlotsByName(self)
+        self.show()
+        self.activateWindow()
 
     def retranslateui(self):
         _translate = QtCore.QCoreApplication.translate
@@ -56,6 +58,7 @@ class PlotterManagerWindow(QtWidgets.QMainWindow):
     def checkbox_changed(self, plotter_num):
         if self.checkboxes[plotter_num].isChecked():
             self.plotters[plotter_num].show()
+            self.plotters[plotter_num].activateWindow()
         else:
             self.plotters[plotter_num].close()
         self.activateWindow()

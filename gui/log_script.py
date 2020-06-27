@@ -2,6 +2,7 @@ import gui.logger as logger
 from pathlib import Path
 from PyQt5 import QtWidgets
 from plotwindow import PlotWindow, IonPumpPlotWindow
+from ui_plottermanagerwindow import PlotterManagerWindow
 from loader import Loader
 import sys
 
@@ -74,7 +75,7 @@ ion_gauge_plotter = PlotWindow(Loader(Path(log_drive, 'IonGauge'), 'IonGauge', q
                                ylabel='Ion Gauge Pressure', units_label='(torr)')
 
 plotters = [mag_plotter, ion_pump_plotter, ion_gauge_plotter]
-for plotter in plotters:
-    plotter.show()
+plotter_manager = PlotterManagerWindow(plotters)
+plotter_manager.show()
 
 sys.exit(app.exec_())
