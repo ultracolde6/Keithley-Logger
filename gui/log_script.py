@@ -66,10 +66,11 @@ keithley_device = logger.Keithley(port=keithley_port, timeout=15, quiet=False)
 controller = logger.Logger(save_groups=save_groups, device=keithley_device, log_freq=t_read_freq, quiet=False)
 
 mag_plotter = PlotWindow(Loader(Path(log_drive, 'MagField'), 'MagField', quiet=True),
-                         save_path=webplot_drive, ylabel='Magnetic Field', units_label='(mG)')
+                         save_path=webplot_drive, ylabel='Magnetic Field', units_label='(mG)',
+                         plot_mode='multiplot')
 ion_pump_plotter = IonPumpPlotWindow(Loader(Path(log_drive, 'IonPump'), 'IonPump', quiet=True),
                                      save_path=webplot_drive, conv_func=(lambda x: 10**x*1e9),
-                                     ylabel='Ion Pump Current', units_label='(nA)')
+                                     ylabel='Ion Pump Current', units_label='(nA)', yscale='log')
 ion_gauge_plotter = PlotWindow(Loader(Path(log_drive, 'IonGauge'), 'IonGauge', quiet=True),
                                save_path=webplot_drive, conv_func=(lambda x: 10**x),
                                ylabel='Ion Gauge Pressure', units_label='(torr)')

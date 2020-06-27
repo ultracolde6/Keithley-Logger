@@ -29,7 +29,8 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
     update_signal = pyqtSignal()
     reconfigure_plot_signal = pyqtSignal()
 
-    def __init__(self, loader, ylabel='Signal Level', units_label='(a.u.)', save_path=None, conv_func=(lambda x: x)):
+    def __init__(self, loader, ylabel='Signal Level', units_label='(a.u.)', save_path=None, conv_func=(lambda x: x),
+                 plot_mode='singleplot', yscale='lin'):
         super(PlotWindow, self).__init__()
         self.loader = loader
         self.setupUi(self)
@@ -52,7 +53,13 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
 
         self.autoscale = None
         self.outlier_reject = None
-        self.yscale = None
+        self.yscale = yscale
+        if self.yscale == 'lin':
+            self.lin_radioButton.setChecked()
+        elif self.yscale == 'log':
+            self.log_radioButton.setChecked()
+        else:
+            raise ValueError(f'Unexpected input string for yscale: {self.yscale}')
         self.ymin = None
         self.ymax = None
         self.refresh_time = 30
@@ -63,7 +70,13 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.history_minutes = None
         self.history_delta = None
         self.outlier_reject_level = 2
-        self.plot_mode = 'singleplot'
+        self.plot_mode = plot_mode
+        if self.plot_mode == 'singleplot':
+            self.single_plot_radioButton.setChecked()
+        elif self.plot_mode == 'multiplot':
+            self.multi_plot_radioButton.setChecked()
+        else:
+            raise ValueError(f'Unexpected input string for plot_mode: {self.plot_mode}')
 
         self.data = pd.DataFrame()
         self.paused = False
