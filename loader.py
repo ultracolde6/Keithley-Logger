@@ -6,7 +6,6 @@ import csv
 
 
 class Loader:
-
     def __init__(self, log_drive, file_prefix, date_format='%Y-%m-%d', time_format='%H:%M:%S', quiet=True):
 
         self.log_drive = log_drive
@@ -61,6 +60,15 @@ class Loader:
         return data
 
     def refresh_data(self, start_datetime):
+        """
+        refresh_data parses through the data log returning a pandas data frame which contains all of the data
+        from start_datetime.date() through the present moment. The Loader class keeps track of which data has
+        previously been loaded by saving previously loaded data in self.data and keeping track of how many
+        lines of data have already been read in from the data file corresponding to the present day in
+        self.lines_loaded. Correspondingly there are chains of logic to ensure this method exhibits the
+        appropriate behaviour depending on the state of the data log and the data which is loaded into self.data
+        and the time period for which data is being requested.
+        """
         start_date = start_datetime.date()
         stop_datetime = datetime.datetime.now()
         stop_date = stop_datetime.date()
@@ -71,19 +79,22 @@ class Loader:
                   f'{stop_datetime.strftime(self.datetime_format)}')
         t0 = datetime.datetime.now()
 
+        # If no data is loaded of if the data range being requested ranges to a time earlier than the
+        # start of the loaded data a `hard reset' is required. A hard reset simply involves clearing self.data
+        # and resetting some flags.
         hard_reset = False
         if self.loaded_start_date is None:
             hard_reset = True
-        if self.loaded_start_date is not None:
+        elif self.loaded_start_date is not None:
             if start_date < self.loaded_start_date:
                 hard_reset = True
             elif self.loaded_start_date < start_date:
+                # Remove data from dates older than the range which is being requested to save memory
                 time_mask = np.logical_and(np.array(start_datetime <= self.data.index),
                                            np.array(self.data.index <= stop_datetime))
                 self.data = self.data.loc[time_mask]
                 self.loaded_start_date = start_datetime.date()
         if hard_reset:
-            # hard reset on data required if data not loaded or start date is earlier than self.loaded_start_date
             self.data = pd.DataFrame()
             self.loaded_start_date = None
             self.loaded_stop_date = None
@@ -95,11 +106,13 @@ class Loader:
                 pass
             else:
                 if date < self.loaded_stop_date:
-                    continue  # dates with date < self.loaded_stop_date should already be included in self.data.
+                    # dates with date < self.loaded_stop_date should already be included in self.data.
+                    # Skip to next date.
+                    continue
                 elif date > self.loaded_stop_date:
-                    self.lines_loaded = 0
                     # if date > self.loaded_stop_date it means we have moved onto a new file
                     # and must start reading at the beginning.
+                    self.lines_loaded = 0
                 elif date == self.loaded_stop_date:
                     # if date == self.loaded_stop_date then current value of self.lines_loaded
                     # will be used to load only recent data.
@@ -113,7 +126,6 @@ class Loader:
                                        header=0,
                                        skiprows=range(1, self.lines_loaded + 1),
                                        parse_dates={'datetime': ['date', 'time']},
-                                       # parse_dates={'datetime': [0, 1]},
                                        index_col='datetime',
                                        infer_datetime_format=True)
                 new_data.index = pd.to_datetime(new_data.index, format=self.datetime_format)

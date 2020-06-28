@@ -207,6 +207,13 @@ class PlotWindow(Ui_PlotWindow, QMainWindow):
             return
 
     def update_settings(self):
+        """
+        Main configuration method for plot functionality. Runs at initialization of Plotter and whenever
+        Update Settings pushButton is clicked. Configures the plot region itself as well as whether the plotting
+        is in the history or tracking mode or static range mode. Plotting is paused during updating settings
+        if not in tracking mode. At the end of the settings update a signal is emitted to update the plot as well
+        to reflect the changes made to the settings.
+        """
         self.pause()
         self.update_yaxis_settings()
         self.update_refresh_settings()
