@@ -8,9 +8,6 @@
 
 
 from PyQt5 import QtCore, QtWidgets
-from loader import Loader
-from plotwindow import PlotWindow
-from pathlib import Path
 
 
 class PlotterManagerWindow(QtWidgets.QMainWindow):
@@ -32,7 +29,7 @@ class PlotterManagerWindow(QtWidgets.QMainWindow):
         for n in range(self.num_plotters):
             self.checkboxes.append(QtWidgets.QCheckBox(self.centralwidget))
             self.checkboxes[n].setChecked(True)
-            self.checkboxes[n].setText(f'plotter #{n:d}: {self.plotters[n].loader.file_prefix}')
+            self.checkboxes[n].setText(f'{self.plotters[n].loader.file_prefix} plotter')
             self.checkboxes[n].setObjectName(f"plotter_checkbox_{n:d}")
             self.verticalLayout.addWidget(self.checkboxes[n])
             self.checkboxes[n].stateChanged.connect(lambda state, num=n: self.checkbox_changed(num))
@@ -53,7 +50,7 @@ class PlotterManagerWindow(QtWidgets.QMainWindow):
 
     def retranslateui(self):
         _translate = QtCore.QCoreApplication.translate
-        self.setWindowTitle(_translate("PlotterManagerWindow", "MainWindow"))
+        self.setWindowTitle(_translate("PlotterManagerWindow", "Plotter Manager"))
 
     def checkbox_changed(self, plotter_num):
         if self.checkboxes[plotter_num].isChecked():
@@ -62,24 +59,3 @@ class PlotterManagerWindow(QtWidgets.QMainWindow):
         else:
             self.plotters[plotter_num].close()
         self.activateWindow()
-
-
-if __name__ == "__main__":
-    import sys
-    app = QtWidgets.QApplication(sys.argv)
-    keithley_logger_temp_path = Path('C:/', 'Users', 'Justin', 'Desktop', 'Working', 'Code', 'Keithley Logger Work')
-    work_dir = Path('C:/', 'Users', 'Justin', 'Desktop', 'Working', 'Code', 'Keithley Logger Work', 'MagField',
-                    'MagField')
-    log_drive = Path(keithley_logger_temp_path, 'Log Drive', 'Fake Data')
-    log_drive_2 = Path(keithley_logger_temp_path, 'Log Drive', 'Mag Data Fake')
-    file_prefix = 'Fake Data'
-    fake_data_loader = Loader(log_drive, file_prefix, quiet=True)
-    mag_data_fake_loader = Loader(log_drive_2, 'Mag Data Fake', quiet=True)
-    mag_data_loader = Loader(work_dir, 'MagField', quiet=True)
-    plotter1 = PlotWindow(fake_data_loader)
-    plotter2 = PlotWindow(mag_data_fake_loader)
-    plotter3 = PlotWindow(mag_data_loader)
-
-    ui = PlotterManagerWindow([plotter1, plotter2, plotter3])
-    ui.show()
-    sys.exit(app.exec_())
