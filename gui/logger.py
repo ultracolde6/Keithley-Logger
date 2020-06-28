@@ -24,32 +24,31 @@ class Logger(QtCore.QObject):
         self.quiet = quiet
 
         self.log_data()  # Log data immediately before starting timer
-
         self.log_freq = log_freq
         self.data_timer = QtCore.QTimer(self)
         self.data_timer.timeout.connect(self.log_data)
         self.data_timer.start(self.log_freq*1e3)
 
     def log_data(self):
-        curr_time, data = self.read_data()
+        curr_datetime, data = self.read_data()
         for chan in self.channels:
             chan.curr_data = chan.conv_func(data[chan.chan_idx])  # Consider saving raw data instead of converted data
         for save_group in self.save_groups:
-            save_group.save_data(curr_time)
+            save_group.save_data(curr_datetime)
 
     def read_data(self):
-        curr_time = datetime.datetime.now()
-        date_time_string = curr_time.strftime('%Y-%m-%d %H:%M:%S')
+        curr_datetime = datetime.datetime.now()
         data = self.device.read()
+        date_time_string = curr_datetime.strftime('%Y-%m-%d %H:%M:%S')
         try:
             if not self.quiet:
-                print(date_time_string + " raw data: " + ", ".join([f"{datum:.3f}" for datum in data]))
+                print(f'{date_time_string} raw data: ' + ', '.join([f"{datum:.3f}" for datum in data]))
         except ValueError:
             if data == ["b''"]:
                 print(date_time_string + ": Error: Received nothing from Keithley")
             else:
                 print(date_time_string + f": Error: Received {data} from Keithley")
-        return curr_time, data
+        return curr_datetime, data
 
 
 class Keithley:
@@ -80,15 +79,14 @@ class Keithley:
 
     def write(self, command):
         # Write a single string or a list of strings to the device
-        if isinstance(command, str):
-            if not self.quiet:
-                print(f'writing: {command}')
-            self.serial.write(f'{command}\n'.encode())
-        elif isinstance(command, list):
+        if isinstance(command, list):
             for cmd in command:
                 self.write(cmd)
         else:
-            raise TypeError('invalid command or command list')
+            if not self.quiet:
+                print(f'writing: {command}')
+            self.serial.write(f'{command}\n'.encode())
+            # Manually insert EOL character for communication and convert to binary for writing with encode()
 
     def read(self):
         # Read data from Keithley and return list of floats representing recorded values
@@ -100,7 +98,7 @@ class Keithley:
     def init_measurement(self, channels):
         """
         The main purpose of this method is to initialize the Keithley to scan the appropriate hardware ports
-        specified in chan.chan_name for each channel in input parameter channels. This is done by the 3 self.write()
+        specified in chan.hard_port for each channel in input parameter channels. This is done by the 3 self.write()
         calls at the end of this method.
         Importantly, the order in which the hardware channels appear in the chan_list_str coincides with the order
         in which the Keithley will read out the hardware channels. The enumeration of each channel in chan_list_str
@@ -175,33 +173,33 @@ class SaveGroup:
         self.time_format = time_format
         self.quiet = quiet
 
-    def save_data(self, time_stamp):
-        data = dict()
-        data['date'] = time_stamp.strftime(self.date_format)
-        data['time'] = time_stamp.strftime(self.time_format)
+    def save_data(self, datetime_stamp):
+        data_dict = dict()
+        data_dict['date'] = datetime_stamp.strftime(self.date_format)
+        data_dict['time'] = datetime_stamp.strftime(self.time_format)
         # Legacy format for saving the data. Would make sense to save datetime string in one cell.
         for chan in self.channels:
-            data[chan.chan_name] = f'{chan.curr_data:f}'
+            data_dict[chan.chan_name] = f'{chan.curr_data:f}'
 
-        file_name = f'{self.group_name} {data["date"]}.csv'
-        file_path = Path(self.log_drive, file_name)
+        log_file_name = f'{self.group_name} {data_dict["date"]}.csv'
+        log_file_path = Path(self.log_drive, log_file_name)
 
         # Attempt to write data to log_drive. Write to error_drive in event of failure.
         try:
-            write_to_csv(file_path, data, quiet=self.quiet)
+            write_to_csv(log_file_path, data_dict, quiet=self.quiet)
         except OSError:
-            print(f'Warning, OSError while attempting to write data to log file: {file_path}')
-            error_file_name = f'Error - {self.group_name} {data["date"]}.csv'
+            print(f'Warning, OSError while attempting to write data to log file: {log_file_path}')
+            error_file_name = f'Error - {log_file_name}'
             error_file_path = Path(self.error_drive, error_file_name)
             try:
-                write_to_csv(error_file_path, data, quiet=self.quiet)
+                write_to_csv(error_file_path, data_dict, quiet=self.quiet)
             except OSError:
                 print(f'Warning, OSError while attempting to write data to error log: {error_file_path}')
 
-        backup_file_name = f'{self.group_name} {data["date"]}.csv'
+        backup_file_name = log_file_name
         backup_file_path = Path(self.backup_drive, backup_file_name)
         try:
-            write_to_csv(backup_file_path, data, quiet=self.quiet)
+            write_to_csv(backup_file_path, data_dict, quiet=self.quiet)
         except OSError:
             print(f'Warning, OSError while attempting to write to backup log: {backup_file_path}')
             # print('Ok, even backup log directory is having trouble. Shit has gone to hell! Abandon ship!')
