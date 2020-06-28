@@ -337,6 +337,12 @@ class PlotWindow(Ui_PlotWindow, QMainWindow):
 
 
 class IonPumpPlotWindow(PlotWindow):
+    """
+    IonPumpPlotWindow extends PlotWindow by including a twinx axis so that ion pump current and pressure can
+    be visualized simultaneously. Note that only singleplot functionality is supported. The conversion function
+    for the twinx axis is hard-coded for the ion pump current to pressure conversion.
+    """
+    # TODO: Implement a twinx option in the Plotter function directly
     def __init__(self, *args, **kwargs):
         super(IonPumpPlotWindow, self).__init__(*args, **kwargs)
 
