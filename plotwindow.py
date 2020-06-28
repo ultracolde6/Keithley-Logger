@@ -341,7 +341,7 @@ class IonPumpPlotWindow(PlotWindow):
 
     def single_plot(self):
         super(IonPumpPlotWindow, self).single_plot()
-        self.conifgure_twinx()
+        self.configure_twinx()
 
     def configure_twinx(self):
         ax = self.axes[0]
