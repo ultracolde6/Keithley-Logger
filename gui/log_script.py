@@ -1,4 +1,4 @@
-import gui.logger as logger
+import logger
 from pathlib import Path
 from PyQt5 import QtWidgets
 from plotwindow import PlotWindow, IonPumpPlotWindow

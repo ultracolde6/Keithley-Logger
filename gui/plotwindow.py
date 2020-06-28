@@ -97,6 +97,7 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.reconfigure_plot_signal.emit()
         self.update_settings()
         self.update()
+        self.setWindowTitle(f'{self.loader.file_prefix} Plotter')
         self.show()
         self.refresh_timer.start(self.refresh_time)
 
