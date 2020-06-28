@@ -93,19 +93,26 @@ def main():
     # sci_west_upper = kmm_data_handler.Channel(hard_port=118, chan_name='sci west upper', conv_func=lambda v: 1000 * v)
     # pump_west = kmm_data_handler.Channel(hard_port=119, chan_name='pump west', conv_func=lambda v: 1000 * v)
     # four_way_x = kmm_data_handler.Channel(hard_port=120, chan_name='4 way x', conv_func=lambda v: 1000 * v)
-    # bake_group = kmm_data_handler.SaveGroup([mot_gate, sci_east_upper, sci_west_upper, pump_west, four_way_x], group_name='Bake', quiet=True,
+    # bake_group = kmm_data_handler.SaveGroup([mot_gate, sci_east_upper, sci_west_upper, pump_west, four_way_x],
+    # group_name='Bake', quiet=True,
     #                                         log_drive=log_drive + 'Bake/',
     #                                         backup_drive=backup_drive + 'Bake/',
     #                                         error_drive=error_drive,
     #                                         webplot_drive=webplot_drive)
     # bake_group.plotter.ylabel = r'Temperature ($^{\circ}C)$'
     #
-    # sci_gate = kmm_data_handler.Channel(hard_port=115, chan_name='sci gate', init_cmds_template=kmm_data_handler.Controller.thcpl_cmds)
-    # sci_south_lower = kmm_data_handler.Channel(hard_port=114, chan_name='sci south lower', init_cmds_template=kmm_data_handler.Controller.thcpl_cmds)
-    # lower_bucket = kmm_data_handler.Channel(hard_port=113, chan_name='lower bucket', init_cmds_template=kmm_data_handler.Keithley.thcpl_cmds)
-    # angle_bellows = kmm_data_handler.Channel(hard_port=106, chan_name='angle bellows', init_cmds_template=kmm_data_handler.Keithley.thcpl_cmds)
-    # rga = kmm_data_handler.Channel(hard_port=111, chan_name='rga', init_cmds_template=kmm_data_handler.Controller.thcpl_cmds)
-    # turbo = kmm_data_handler.Channel(hard_port=108, chan_name='turbo', init_cmds_template=kmm_data_handler.Controller.thcpl_cmds)
+    # sci_gate = kmm_data_handler.Channel(hard_port=115, chan_name='sci gate',
+    #                                     init_cmds_template=kmm_data_handler.Controller.thcpl_cmds)
+    # sci_south_lower = kmm_data_handler.Channel(hard_port=114, chan_name='sci south lower',
+    #                                            init_cmds_template=kmm_data_handler.Controller.thcpl_cmds)
+    # lower_bucket = kmm_data_handler.Channel(hard_port=113, chan_name='lower bucket',
+    #                                         init_cmds_template=kmm_data_handler.Keithley.thcpl_cmds)
+    # angle_bellows = kmm_data_handler.Channel(hard_port=106, chan_name='angle bellows',
+    # init_cmds_template=kmm_data_handler.Keithley.thcpl_cmds)
+    # rga = kmm_data_handler.Channel(hard_port=111, chan_name='rga',
+    # init_cmds_template=kmm_data_handler.Controller.thcpl_cmds)
+    # turbo = kmm_data_handler.Channel(hard_port=108, chan_name='turbo',
+    # init_cmds_template=kmm_data_handler.Controller.thcpl_cmds)
     # bake_group_2 = kmm_data_handler.SaveGroup([sci_gate, sci_south_lower, lower_bucket, angle_bellows, rga, turbo],
     #                                         group_name='Bake 2', quiet=True,
     #                                         log_drive=log_drive + 'Bake 2/',
@@ -114,9 +121,12 @@ def main():
     #                                         webplot_drive=webplot_drive)
     # bake_group_2.plotter.ylabel = r'Temperature ($^{\circ}C)$'
     #
-    # sci_ion = kmm_data_handler.Channel(hard_port=101, chan_name='sci ion', init_cmds_template=kmm_data_handler.Keithley.thcpl_cmds)
-    # neg = kmm_data_handler.Channel(hard_port=102, chan_name='neg', init_cmds_template=kmm_data_handler.Keithley.thcpl_cmds)
-    # pump_east = kmm_data_handler.Channel(hard_port=103, chan_name='pump east', init_cmds_template=kmm_data_handler.Keithley.thcpl_cmds)
+    # sci_ion = kmm_data_handler.Channel(hard_port=101, chan_name='sci ion',
+    # init_cmds_template=kmm_data_handler.Keithley.thcpl_cmds)
+    # neg = kmm_data_handler.Channel(hard_port=102, chan_name='neg',
+    # init_cmds_template=kmm_data_handler.Keithley.thcpl_cmds)
+    # pump_east = kmm_data_handler.Channel(hard_port=103, chan_name='pump east',
+    # init_cmds_template=kmm_data_handler.Keithley.thcpl_cmds)
     # bake_group_3 = kmm_data_handler.SaveGroup([sci_ion, neg, pump_east],
     #                                         group_name='Bake 3', quiet=True,
     #                                         log_drive=log_drive + 'Bake 3/',

@@ -90,15 +90,15 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.update_pushButton.clicked.connect(self.update)
         self.reconfigure_plot_signal.connect(self.plot_worker.run_configure_axes)
 
+        self.save_timer = QtCore.QTimer(self)
+        self.save_timer.timeout.connect(self.plot_worker.save)
+        self.save_timer.start(self.save_freq)
+
         self.reconfigure_plot_signal.emit()
         self.update_settings()
         self.update()
         self.show()
         self.refresh_timer.start(self.refresh_time)
-
-        self.save_timer = QtCore.QTimer(self)
-        self.save_timer.timeout.connect(self.plot_worker.save)
-        self.save_timer.start(self.save_freq)
 
     def configure_axes(self):
         self.figure.clear()
@@ -309,16 +309,18 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
             self.resume()
 
     def pause(self):
-        self.refresh_timer.stop()
-        self.save_timer.stop()
-        self.pause_pushButton.setText('Resume')
-        self.paused = True
+        if self.tracking:
+            self.refresh_timer.stop()
+            self.save_timer.stop()
+            self.pause_pushButton.setText('Resume')
+            self.paused = True
 
     def resume(self):
-        self.refresh_timer.start(self.refresh_time)
-        self.save_timer.start()
-        self.pause_pushButton.setText('Pause')
-        self.paused = False
+        if self.tracking:
+            self.refresh_timer.start(self.refresh_time)
+            self.save_timer.start()
+            self.pause_pushButton.setText('Pause')
+            self.paused = False
 
     def save_plot(self):
         save_file = Path(self.save_path, f'{self.loader.file_prefix}.png')
