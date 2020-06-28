@@ -1,154 +1,232 @@
-import datetime
+import serial
 import time
-import threading
-import importlib
-# import matplotlib.pyplot as plt
-import kmm_data_handler
-import kmm_plot_funcs
-
-importlib.reload(kmm_data_handler)
+import datetime
+from pathlib import Path
+import csv
+from PyQt5 import QtCore
 
 
-def logger_routine(controller, t_read_freq):
-    # This opens the serial port and initializes the multimeter
-    with controller.device:
-        # Initialize channels
-        controller.init_measurement()
-        print('Initialized!')
-        time.sleep(1)
-        delay = datetime.timedelta(seconds=t_read_freq)
-        while True:
+class Logger(QtCore.QObject):
+    """
+    Configure data acquisition, process/organize data as it comes in, and control visualization of data
+    """
+    def __init__(self, save_groups, device, log_freq, quiet=True):
+        super(Logger, self).__init__()
+        self.save_groups = save_groups
+        self.channels = []
+        for save_group in self.save_groups:
+            for channel in save_group.channels:
+                self.channels.append(channel)  # Add all of the channels in all of the save_groups into self.channels
+
+        self.device = device
+        self.device.init_measurement(self.channels)
+
+        self.quiet = quiet
+
+        self.log_data()  # Log data immediately before starting timer
+        self.log_freq = log_freq
+        self.data_timer = QtCore.QTimer(self)
+        self.data_timer.timeout.connect(self.log_data)
+        self.data_timer.start(self.log_freq*1e3)
+
+    def log_data(self):
+        curr_datetime, data = self.read_data()
+        for chan in self.channels:
+            chan.curr_data = chan.conv_func(data[chan.chan_idx])  # Consider saving raw data instead of converted data
+        for save_group in self.save_groups:
+            save_group.save_data(curr_datetime)
+
+    def read_data(self):
+        curr_datetime = datetime.datetime.now()
+        data = self.device.read()
+        date_time_string = curr_datetime.strftime('%Y-%m-%d %H:%M:%S')
+        try:
+            if not self.quiet:
+                print(f'{date_time_string} raw data: ' + ', '.join([f"{datum:.3f}" for datum in data]))
+        except ValueError:
+            if data == ["b''"]:
+                print(date_time_string + ": Error: Received nothing from Keithley")
+            else:
+                print(date_time_string + f": Error: Received {data} from Keithley")
+        return curr_datetime, data
+
+
+class Keithley:
+    """
+    Handles serial communication with and initialization of the Keithley2700 multimeter
+    """
+    preamble = ["*RST",
+                "SYST:PRES",
+                "SYST:BEEP OFF",
+                "TRAC:CLE",
+                "TRAC:CLE:AUTO OFF",
+                "INIT:CONT OFF",
+                "TRIG:COUN 1",
+                "FORM:ELEM READ"]
+
+    def __init__(self, port='COM0', baud_rate=9600, timeout=15, quiet=True):
+        self.port = port
+        self.baud_rate = baud_rate
+        self.timeout = timeout
+        self.quiet = quiet
+
+        self.serial = serial.Serial(self.port, self.baud_rate, timeout=self.timeout)
+        print(f'Connected to device at {self.port}')
+        for command in self.preamble:
+            self.write(command)
+            time.sleep(0.25)
+        self.serial.flushInput()
+
+    def write(self, command):
+        # Write a single string or a list of strings to the device
+        if isinstance(command, list):
+            for cmd in command:
+                self.write(cmd)
+        else:
+            if not self.quiet:
+                print(f'writing: {command}')
+            self.serial.write(f'{command}\n'.encode())
+            # Manually insert EOL character for communication and convert to binary for writing with encode()
+
+    def read(self):
+        # Read data from Keithley and return list of floats representing recorded values
+        self.write("READ?")
+        data = self.serial.read_until(b"\r").decode().split(',')
+        data = list(map(float, data))
+        return data
+
+    def init_measurement(self, channels):
+        """
+        The main purpose of this method is to initialize the Keithley to scan the appropriate hardware ports
+        specified in chan.hard_port for each channel in input parameter channels. This is done by the 3 self.write()
+        calls at the end of this method.
+        Importantly, the order in which the hardware channels appear in the chan_list_str coincides with the order
+        in which the Keithley will read out the hardware channels. The enumeration of each channel in chan_list_str
+        is saved in the channel.chan_idx attribute for each channel.
+        This enumeration will be recalled when the Logger object parses the data from the Keithley readout in the
+        Logger.log_data() method.
+        """
+        for idx, chan in enumerate(channels):
+            chan.chan_idx = idx
+            self.write(chan.init_cmds)
+            print(f'Initialized logical channel {chan.chan_idx:d}: {chan.chan_name} '
+                  f'at Keithley port ({chan.hard_port:d})')
+        chan_list_str = '(@' + ','.join([str(chan.hard_port) for chan in channels]) + ')'
+        self.write(f"ROUT:SCAN {chan_list_str}")
+        self.write(f"SAMP:COUN {len(channels)}")
+        self.write("ROUT:SCAN:LSEL INT")
+
+    @staticmethod
+    def volt_cmds(hard_port):
+        return [f"SENS:FUNC 'VOLT',(@{hard_port})",
+                f"SENS:VOLT:NPLC 5,(@{hard_port})",
+                f"SENS:VOLT:RANG 5,(@{hard_port})"]
+
+    @staticmethod
+    def rtd_cmds(hard_port):
+        return [f"SENS:FUNC 'TEMP',(@{hard_port})",
+                f"SENS:TEMP:TRAN FRTD,(@{hard_port})",
+                f"SENS:TEMP:FRTD:TYPE PT100,(@{hard_port})",
+                f"SENS:TEMP:NPLC 5,(@{hard_port})"]
+
+    @staticmethod
+    def thcpl_cmds(hard_port):
+        return [f"SENS:FUNC 'TEMP',(@{hard_port})",
+                f"SENS:TEMP:TRAN TC,(@{hard_port})",
+                f"SENS:TEMP:TC:TYPE K,(@{hard_port})",
+                # f"SENS:TEMP:TC:RJUN:RSEL INT,(@{hard_port})",
+                f"SENS:TEMP:TC:RJUN:RSEL SIM,(@{hard_port})",
+                f"SENS:TEMP:TC:RJUN:SIM 23,(@{hard_port})",
+                f"SENS:TEMP:NPLC 5,(@{hard_port})"]
+
+
+class Channel:
+    """
+    Single data channel
+    """
+    def __init__(self, hard_port=101, chan_idx=0, chan_name="Voltage",
+                 conv_func=lambda x: x, init_cmds_template=Keithley.volt_cmds):
+        self.hard_port = hard_port
+        self.chan_idx = chan_idx  # chan_idx will be configured by the Logger and Keithley objects upon initialization
+        self.chan_name = chan_name
+        self.conv_func = conv_func
+        self.init_cmds = init_cmds_template(hard_port)
+        self.curr_data = 0
+
+
+class SaveGroup:
+    """
+    Collection of channels whose data will be saved in a common file.
+    """
+    def __init__(self, channels, group_name='DataGroup',
+                 log_drive=None, backup_drive=None, error_drive=None, webplot_drive=None,
+                 date_format='%Y-%m-%d', time_format='%H:%M:%S', quiet=True):
+        self.channels = channels
+        if not isinstance(self.channels, list):
+            self.channels = [self.channels]
+        self.group_name = group_name
+        self.log_drive = log_drive
+        self.backup_drive = backup_drive
+        self.error_drive = error_drive
+        self.webplot_drive = webplot_drive
+        self.date_format = date_format
+        self.time_format = time_format
+        self.quiet = quiet
+
+    def save_data(self, datetime_stamp):
+        data_dict = dict()
+        data_dict['date'] = datetime_stamp.strftime(self.date_format)
+        data_dict['time'] = datetime_stamp.strftime(self.time_format)
+        # Legacy format for saving the data. Would make sense to save datetime string in one cell.
+        for chan in self.channels:
+            data_dict[chan.chan_name] = f'{chan.curr_data:f}'
+
+        log_file_name = f'{self.group_name} {data_dict["date"]}.csv'
+        log_file_path = Path(self.log_drive, log_file_name)
+
+        # Attempt to write data to log_drive. Write to error_drive in event of failure.
+        try:
+            write_to_csv(log_file_path, data_dict, quiet=self.quiet)
+        except OSError:
+            print(f'Warning, OSError while attempting to write data to log file: {log_file_path}')
+            error_file_name = f'Error - {log_file_name}'
+            error_file_path = Path(self.error_drive, error_file_name)
             try:
-                curr_time = datetime.datetime.now()
-                controller.get_data()
-                while curr_time + delay > datetime.datetime.now():
-                    time.sleep(1)
-            except (KeyboardInterrupt, SystemExit):
-                print('You hit Ctrl-C')
-                break
+                write_to_csv(error_file_path, data_dict, quiet=self.quiet)
+            except OSError:
+                print(f'Warning, OSError while attempting to write data to error log: {error_file_path}')
+
+        backup_file_name = log_file_name
+        backup_file_path = Path(self.backup_drive, backup_file_name)
+        try:
+            write_to_csv(backup_file_path, data_dict, quiet=self.quiet)
+        except OSError:
+            print(f'Warning, OSError while attempting to write to backup log: {backup_file_path}')
+            # print('Ok, even backup log directory is having trouble. Shit has gone to hell! Abandon ship!')
 
 
-def main():
-    log_drive = 'Y:/smalldata-e6/KeithleyLogger Data/'
-    backup_drive = 'C:/KeithleyLoggerBackup/'
-    error_drive = 'C:/KeithleyLoggerBackup/Error/'
-    webplot_drive = '//oxford.physics.berkeley.edu/web/internal/e6/'
-
-    kmm_port = 'COM6'  # Port for Keithley multimeter (kmm)
-
-    t_read_freq = 30  # How often to query Keithley multimeter for new data
-    t_plot_freq = datetime.timedelta(seconds=10)  # How often to produce new plots
-    t_plot_history = datetime.timedelta(hours=12)  # How far back in history the plots should reach
-
-    # Bartington Mag690-100 outputs 100 mV/uT = 0.01 V/mG so 100 mG/V, 100 uG/mV
-    mag_x = kmm_data_handler.Channel(hard_port=101, chan_name='Mag X', conv_func=lambda v: v * 100)
-    mag_y = kmm_data_handler.Channel(hard_port=102, chan_name='Mag Y', conv_func=lambda v: v * 100)
-    mag_z = kmm_data_handler.Channel(hard_port=103, chan_name='Mag Z', conv_func=lambda v: v * 100)
-    mag_group = kmm_data_handler.SaveGroup([mag_x, mag_y, mag_z], group_name='MagField', quiet=True,
-                                           log_drive=log_drive + 'MagField/',
-                                           backup_drive=backup_drive + 'MagField/',
-                                           error_drive=error_drive,
-                                           webplot_drive=webplot_drive)
-    mag_group.plotter.plot_func = kmm_plot_funcs.make_mag_plot
-
-    # Terranova ion gauge controller reads out a pseudo-logarithmic voltage. It is 0.5 volts per decade and has
-    # an offset. The Terranova manual expresses this in a very confusing way that makes it difficult to determine
-    # the offset. There is a write up in onenote and on the server about it. The data saved here is Log10(P/P0).
-    # The actual pressures (1e-10 level) are too high of precision to be straightforwardly stored in the .csv.
-    ion_gauge = kmm_data_handler.Channel(hard_port=106, chan_name='IonGauge', conv_func=lambda v: (v - 5) / 0.5)
-    ion_gauge_group = kmm_data_handler.SaveGroup([ion_gauge], group_name='IonGauge', quiet=True,
-                                                 log_drive=log_drive + 'IonGauge/',
-                                                 backup_drive=backup_drive + 'IonGauge/',
-                                                 error_drive=error_drive,
-                                                 webplot_drive=webplot_drive)
-    ion_gauge_group.plotter.plot_func = kmm_plot_funcs.make_ion_gauge_plot
-
-    # Gamma ion pump controller outputs a logarithmic voltage which is related to either the measured pressure or
-    # current of the ion pump. Now it is configured to give a logarithmic reading of the current. The offset is
-    # adjustable and set to 10 volts. This means that a current 1 A would register as 10 volts and 1e-8 A (10 nA)
-    # would register as 2V. The data saved here is Log10(I/I0).
-    ion_pump = kmm_data_handler.Channel(hard_port=104, chan_name='IonPump', conv_func=lambda v: (v - 10))
-    ion_pump_group = kmm_data_handler.SaveGroup([ion_pump], group_name='IonPump', quiet=True,
-                                                log_drive=log_drive + 'IonPump/',
-                                                backup_drive=backup_drive + 'IonPump/',
-                                                error_drive=error_drive,
-                                                webplot_drive=webplot_drive)
-    ion_pump_group.plotter.plot_func = kmm_plot_funcs.make_ion_pump_plot
-
-    # Omega temperature converters readout 1 degree per mV.
-    # temp_exp_cloud = kmm_data_handler.Channel(hard_port=108, chan_name='Temp_exp_cloud', conv_func=lambda v: 1000 * v)
-    # temp_exp_table = kmm_data_handler.Channel(hard_port=110, chan_name='Temp_exp_table', conv_func=lambda v: 1000 * v)
-    # # temp_bake = kmm_data_handler.Channel(hard_port=111, chan_name='Temp_bake', conv_func=lambda v: 1000 * v)
-    # # temp_gauge = kmm_data_handler.Channel(hard_port=113, chan_name='Temp_gauge', conv_func=lambda v: 1000 * v)
-    # temp_group = kmm_data_handler.SaveGroup([temp_exp_cloud, temp_exp_table], group_name='Temp', quiet=True,
-    #                                         log_drive=log_drive + 'Temp/',
-    #                                         backup_drive=backup_drive + 'Temp/',
-    #                                         error_drive=error_drive,
-    #                                         webplot_drive=webplot_drive)
-    # temp_group.plotter.ylabel = r'Temperature ($^{\circ}C)$'
-
-    # Omega temperature converters readout 1 degree per mV.
-    # mot_gate = kmm_data_handler.Channel(hard_port=116, chan_name='mot gate', conv_func=lambda v: 1000 * v)
-    # sci_east_upper = kmm_data_handler.Channel(hard_port=117, chan_name='sci east upper', conv_func=lambda v: 1000 * v)
-    # sci_west_upper = kmm_data_handler.Channel(hard_port=118, chan_name='sci west upper', conv_func=lambda v: 1000 * v)
-    # pump_west = kmm_data_handler.Channel(hard_port=119, chan_name='pump west', conv_func=lambda v: 1000 * v)
-    # four_way_x = kmm_data_handler.Channel(hard_port=120, chan_name='4 way x', conv_func=lambda v: 1000 * v)
-    # bake_group = kmm_data_handler.SaveGroup([mot_gate, sci_east_upper, sci_west_upper, pump_west, four_way_x],
-    # group_name='Bake', quiet=True,
-    #                                         log_drive=log_drive + 'Bake/',
-    #                                         backup_drive=backup_drive + 'Bake/',
-    #                                         error_drive=error_drive,
-    #                                         webplot_drive=webplot_drive)
-    # bake_group.plotter.ylabel = r'Temperature ($^{\circ}C)$'
-    #
-    # sci_gate = kmm_data_handler.Channel(hard_port=115, chan_name='sci gate',
-    #                                     init_cmds_template=kmm_data_handler.Controller.thcpl_cmds)
-    # sci_south_lower = kmm_data_handler.Channel(hard_port=114, chan_name='sci south lower',
-    #                                            init_cmds_template=kmm_data_handler.Controller.thcpl_cmds)
-    # lower_bucket = kmm_data_handler.Channel(hard_port=113, chan_name='lower bucket',
-    #                                         init_cmds_template=kmm_data_handler.Keithley.thcpl_cmds)
-    # angle_bellows = kmm_data_handler.Channel(hard_port=106, chan_name='angle bellows',
-    # init_cmds_template=kmm_data_handler.Keithley.thcpl_cmds)
-    # rga = kmm_data_handler.Channel(hard_port=111, chan_name='rga',
-    # init_cmds_template=kmm_data_handler.Controller.thcpl_cmds)
-    # turbo = kmm_data_handler.Channel(hard_port=108, chan_name='turbo',
-    # init_cmds_template=kmm_data_handler.Controller.thcpl_cmds)
-    # bake_group_2 = kmm_data_handler.SaveGroup([sci_gate, sci_south_lower, lower_bucket, angle_bellows, rga, turbo],
-    #                                         group_name='Bake 2', quiet=True,
-    #                                         log_drive=log_drive + 'Bake 2/',
-    #                                         backup_drive=backup_drive + 'Bake 2/',
-    #                                         error_drive=error_drive,
-    #                                         webplot_drive=webplot_drive)
-    # bake_group_2.plotter.ylabel = r'Temperature ($^{\circ}C)$'
-    #
-    # sci_ion = kmm_data_handler.Channel(hard_port=101, chan_name='sci ion',
-    # init_cmds_template=kmm_data_handler.Keithley.thcpl_cmds)
-    # neg = kmm_data_handler.Channel(hard_port=102, chan_name='neg',
-    # init_cmds_template=kmm_data_handler.Keithley.thcpl_cmds)
-    # pump_east = kmm_data_handler.Channel(hard_port=103, chan_name='pump east',
-    # init_cmds_template=kmm_data_handler.Keithley.thcpl_cmds)
-    # bake_group_3 = kmm_data_handler.SaveGroup([sci_ion, neg, pump_east],
-    #                                         group_name='Bake 3', quiet=True,
-    #                                         log_drive=log_drive + 'Bake 3/',
-    #                                         backup_drive=backup_drive + 'Bake 3/',
-    #                                         error_drive=error_drive,
-    #                                         webplot_drive=webplot_drive)
-    # bake_group_3.plotter.ylabel = r'Temperature ($^{\circ}C)$'
-
-    # save_groups = [mag_group, ion_pump_group, temp_group, ion_gauge_group]
-    save_groups = [mag_group, ion_pump_group, ion_gauge_group]
-
-    for save_group in save_groups:
-        save_group.plotter.t_plot_freq = t_plot_freq
-        save_group.plotter.t_plot_history = t_plot_history
-        # save_group.plotter.show = False
-
-    kmm = kmm_data_handler.Keithley(port=kmm_port, timeout=5, quiet=True)
-    controller = kmm_data_handler.Controller(save_groups=save_groups, device=kmm)
-
-    logger_thread = threading.Thread(target=logger_routine, args=(controller, t_read_freq))
-    logger_thread.start()
+def write_to_csv(file_path, data_dict, quiet=True):
+    keys = data_dict.keys()
+    file_exists = Path.is_file(file_path)
+    if file_exists:
+        fieldnames = get_csv_header(file_path)
+        if set(fieldnames) != set(keys):
+            raise ValueError(f'keys {keys} in data input do not match header {fieldnames} for {file_path}')
+    else:
+        fieldnames = keys
+    file_path.parent.mkdir(exist_ok=True)
+    with file_path.open('a') as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow(data_dict)
+        if not quiet:
+            print(f'wrote {data_dict} to {file_path}')
 
 
-if __name__ == '__main__':
-    main()
+def get_csv_header(file_path):
+    # Returns the first line of a .csv file to be interpreted as the header.
+    with open(file_path, 'r') as file:
+        reader = csv.reader(file)
+        header = next(reader)
+    return header
