@@ -1,9 +1,10 @@
-import serial
-import time
+from time import sleep
 import datetime
 from pathlib import Path
 import csv
+import serial
 from PyQt5 import QtCore
+from loader import Loader
 
 
 class Logger(QtCore.QObject):
@@ -74,7 +75,7 @@ class Keithley:
         print(f'Connected to device at {self.port}')
         for command in self.preamble:
             self.write(command)
-            time.sleep(0.25)
+            sleep(0.25)
         self.serial.flushInput()
 
     def write(self, command):
@@ -203,6 +204,11 @@ class SaveGroup:
         except OSError:
             print(f'Warning, OSError while attempting to write to backup log: {backup_file_path}')
             # print('Ok, even backup log directory is having trouble. Shit has gone to hell! Abandon ship!')
+
+    def make_loader(self, quiet=None):
+        if quiet is None:
+            quiet = self.quiet
+        return Loader(self.log_drive, self.group_name, quiet=quiet)
 
 
 def write_to_csv(file_path, data_dict, quiet=True):

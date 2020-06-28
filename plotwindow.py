@@ -1,13 +1,13 @@
-import datetime
-from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import QThread, pyqtSignal
-from ui_plotwindow import Ui_PlotWindow
-import pandas as pd
 import numpy as np
+import datetime
 from pathlib import Path
+import pandas as pd
+from PyQt5.QtCore import QObject, pyqtSignal, QTimer, QThread
+from PyQt5.QtWidgets import QMainWindow
+from ui_plotwindow import Ui_PlotWindow
 
 
-class PlotWorker(QtCore.QObject):
+class PlotWorker(QObject):
     def __init__(self, plot_window):
         super(PlotWorker, self).__init__()
         self.plot_window = plot_window
@@ -25,7 +25,7 @@ class PlotWorker(QtCore.QObject):
         self.plot_window.save_plot()
 
 
-class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
+class PlotWindow(Ui_PlotWindow, QMainWindow):
     update_signal = pyqtSignal()
     reconfigure_plot_signal = pyqtSignal()
 
@@ -84,13 +84,13 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.tracking = True
         self.updating = False
 
-        self.refresh_timer = QtCore.QTimer(self)
+        self.refresh_timer = QTimer(self)
         self.refresh_timer.timeout.connect(self.update)
         self.update_signal.connect(self.plot_worker.run_update)
         self.update_pushButton.clicked.connect(self.update)
         self.reconfigure_plot_signal.connect(self.plot_worker.run_configure_axes)
 
-        self.save_timer = QtCore.QTimer(self)
+        self.save_timer = QTimer(self)
         self.save_timer.timeout.connect(self.plot_worker.save)
         self.save_timer.start(self.save_freq)
 
@@ -340,20 +340,11 @@ class IonPumpPlotWindow(PlotWindow):
         return axes
 
     def single_plot(self):
-        plot_data = self.data[self.data_fields]
-        plot_data = self.clip_data(plot_data)
-        plot_data = plot_data.apply(self.conv_func)
-        ax = self.axes[0]
-        ax.clear()
-        try:
-            plot_data.plot(ax=ax, style='.')
-        except TypeError:
-            print('No Data to plot')
-        self.axis_scalings()
-        ax.set_ylabel(f'{self.ylabel} {self.units_label}')
-        ax.set_xlabel('Time')
-        ax.legend(loc='lower left')
+        super(IonPumpPlotWindow, self).single_plot()
+        self.conifgure_twinx()
 
+    def configure_twinx(self):
+        ax = self.axes[0]
         ax2 = self.axes[1]
         ymin, ymax = ax.get_ylim()
         ax2.set_ylim(self.curr2press(ymin), self.curr2press(ymax))

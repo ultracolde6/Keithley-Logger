@@ -1,10 +1,9 @@
-import logger
+import sys
 from pathlib import Path
 from PyQt5 import QtWidgets
+import logger
 from plotwindow import PlotWindow, IonPumpPlotWindow
 from ui_plottermanagerwindow import PlotterManagerWindow
-from loader import Loader
-import sys
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
@@ -26,9 +25,9 @@ if __name__ == '__main__':
                                  backup_drive=Path(backup_drive, 'MagField'),
                                  error_drive=error_drive,
                                  webplot_drive=webplot_drive)
-    mag_plotter = PlotWindow(Loader(Path(log_drive, 'MagField'), 'MagField', quiet=True),
-                             save_path=webplot_drive, ylabel='Magnetic Field', units_label='(mG)',
-                             plot_mode='multiplot')
+    mag_loader = mag_group.make_loader()
+    mag_plotter = PlotWindow(mag_loader, save_path=webplot_drive, ylabel='Magnetic Field',
+                             units_label='(mG)', plot_mode='multiplot')
 
     # Terranova ion gauge controller reads out a pseudo-logarithmic voltage. It is 0.5 volts per decade and has
     # an offset. The Terranova manual expresses this in a very confusing way that makes it difficult to determine
@@ -40,8 +39,8 @@ if __name__ == '__main__':
                                        backup_drive=Path(backup_drive, 'IonGauge'),
                                        error_drive=error_drive,
                                        webplot_drive=webplot_drive)
-    ion_gauge_plotter = PlotWindow(Loader(Path(log_drive, 'IonGauge'), 'IonGauge', quiet=True),
-                                   save_path=webplot_drive, conv_func=(lambda x: 10**x),
+    ion_gauge_loader = ion_gauge_group.make_loader()
+    ion_gauge_plotter = PlotWindow(ion_gauge_loader, save_path=webplot_drive, conv_func=(lambda x: 10**x),
                                    ylabel='Ion Gauge Pressure', units_label='(torr)', yscale='log')
 
     # Gamma ion pump controller outputs a logarithmic voltage which is related to either the measured pressure or
@@ -54,8 +53,8 @@ if __name__ == '__main__':
                                       backup_drive=Path(backup_drive, 'IonPump'),
                                       error_drive=error_drive,
                                       webplot_drive=webplot_drive)
-    ion_pump_plotter = IonPumpPlotWindow(Loader(Path(log_drive, 'IonPump'), 'IonPump', quiet=True),
-                                         save_path=webplot_drive, conv_func=(lambda x: 10**x*1e9),
+    ion_pump_loader = ion_pump_group.make_loader()
+    ion_pump_plotter = IonPumpPlotWindow(ion_pump_loader, save_path=webplot_drive, conv_func=(lambda x: 10**x*1e9),
                                          ylabel='Ion Pump Current', units_label='(nA)')
 
     # Omega temperature converters readout 1 degree per mV.
@@ -67,10 +66,9 @@ if __name__ == '__main__':
     #                                         error_drive=error_drive,
     #                                         webplot_drive=webplot_drive)
 
-    save_groups = [mag_group, ion_pump_group, ion_gauge_group]
-
     keithley_device = logger.Keithley(port=keithley_port, timeout=15, quiet=True)
-    controller = logger.Logger(save_groups=save_groups, device=keithley_device, log_freq=t_read_freq, quiet=False)
+    save_groups = [mag_group, ion_pump_group, ion_gauge_group]
+    logger_object = logger.Logger(save_groups=save_groups, device=keithley_device, log_freq=t_read_freq, quiet=False)
 
     plotters = [mag_plotter, ion_pump_plotter, ion_gauge_plotter]
     plotter_manager = PlotterManagerWindow(plotters)
