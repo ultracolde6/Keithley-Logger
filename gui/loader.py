@@ -17,7 +17,6 @@ class Loader:
         self.quiet = quiet
 
         self.data = None
-        self.data_loaded = False
         self.loaded_start_date = None
         self.loaded_stop_date = None
         self.lines_loaded = 0
@@ -62,7 +61,6 @@ class Loader:
         return data
 
     def refresh_data(self, start_datetime):
-        # TODO: Trim self.data to prevent excess memory usage
         start_date = start_datetime.date()
         stop_datetime = datetime.datetime.now()
         stop_date = stop_datetime.date()
@@ -73,19 +71,31 @@ class Loader:
                   f'{stop_datetime.strftime(self.datetime_format)}')
         t0 = datetime.datetime.now()
 
-        if not self.data_loaded or start_date < self.loaded_start_date:
+        hard_reset = False
+        if self.loaded_start_date is None:
+            hard_reset = True
+        if self.loaded_start_date is not None:
+            if start_date < self.loaded_start_date:
+                hard_reset = True
+            elif self.loaded_start_date < start_date:
+                time_mask = np.logical_and(np.array(start_datetime <= self.data.index),
+                                           np.array(self.data.index <= stop_datetime))
+                self.data = self.data.loc[time_mask]
+                self.loaded_start_date = start_datetime.date()
+        if hard_reset:
             # hard reset on data required if data not loaded or start date is earlier than self.loaded_start_date
             self.data = pd.DataFrame()
             self.loaded_start_date = None
             self.loaded_stop_date = None
             self.lines_loaded = 0
+
         date_range = [dt.date() for dt in pd.date_range(start_date, stop_date).to_pydatetime()]
         for date in date_range:
             if self.loaded_start_date is None or self.loaded_stop_date is None:
                 pass
             else:
                 if date < self.loaded_stop_date:
-                    continue  # dates with date < self.stop_date should already be included in self.data.
+                    continue  # dates with date < self.loaded_stop_date should already be included in self.data.
                 elif date > self.loaded_stop_date:
                     self.lines_loaded = 0
                     # if date > self.loaded_stop_date it means we have moved onto a new file
@@ -117,12 +127,7 @@ class Loader:
             if self.loaded_start_date is None:
                 self.loaded_start_date = date
             self.loaded_stop_date = date
-            self.data_loaded = True
 
-        time_mask = np.logical_and(np.array(start_datetime <= self.data.index),
-                                   np.array(self.data.index <= stop_datetime))
-        self.data = self.data.loc[time_mask]
-        self.loaded_start_date = start_datetime.date()
         if not self.quiet:
             tf = datetime.datetime.now()
             dt = (tf-t0).total_seconds()

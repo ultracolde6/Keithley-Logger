@@ -146,8 +146,6 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.axis_scalings()
         ax.set_ylabel(f'{self.ylabel} {self.units_label}')
         ax.set_xlabel('Time')
-        # box = ax.get_position()
-        # ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
         ax.legend(loc='lower left')
 
     def multi_plot(self):
@@ -353,8 +351,6 @@ class IonPumpPlotWindow(PlotWindow):
         self.axis_scalings()
         ax.set_ylabel(f'{self.ylabel} {self.units_label}')
         ax.set_xlabel('Time')
-        # box = ax.get_position()
-        # ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
         ax.legend(loc='lower left')
 
         ax2 = self.axes[1]
