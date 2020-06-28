@@ -42,7 +42,7 @@ if __name__ == '__main__':
                                        webplot_drive=webplot_drive)
     ion_gauge_plotter = PlotWindow(Loader(Path(log_drive, 'IonGauge'), 'IonGauge', quiet=True),
                                    save_path=webplot_drive, conv_func=(lambda x: 10**x),
-                                   ylabel='Ion Gauge Pressure', units_label='(torr)')
+                                   ylabel='Ion Gauge Pressure', units_label='(torr)', yscale='log')
 
     # Gamma ion pump controller outputs a logarithmic voltage which is related to either the measured pressure or
     # current of the ion pump. Now it is configured to give a logarithmic reading of the current. The offset is
@@ -56,7 +56,7 @@ if __name__ == '__main__':
                                       webplot_drive=webplot_drive)
     ion_pump_plotter = IonPumpPlotWindow(Loader(Path(log_drive, 'IonPump'), 'IonPump', quiet=True),
                                          save_path=webplot_drive, conv_func=(lambda x: 10**x*1e9),
-                                         ylabel='Ion Pump Current', units_label='(nA)', yscale='log')
+                                         ylabel='Ion Pump Current', units_label='(nA)')
 
     # Omega temperature converters readout 1 degree per mV.
     # temp_exp_cloud = kmm_data_handler.Channel(hard_port=108, chan_name='Temp_exp_cloud', conv_func=lambda v: 1000 * v)

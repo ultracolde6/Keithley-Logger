@@ -30,36 +30,43 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
     reconfigure_plot_signal = pyqtSignal()
 
     def __init__(self, loader, ylabel='Signal Level', units_label='(a.u.)', save_path=None, conv_func=(lambda x: x),
-                 plot_mode='singleplot', yscale='lin'):
+                 plot_mode='singleplot', yscale='linear', save_freq=int(10e3)):
         super(PlotWindow, self).__init__()
-        self.loader = loader
         self.setupUi(self)
+
+        self.loader = loader
+        self.ylabel = ylabel
+        self.units_label = units_label
+        self.save_path = save_path
+        if self.save_path is None:
+            self.save_path = self.loader.log_drive
+        self.conv_func = conv_func
+        self.plot_mode = plot_mode
+        self.yscale = yscale
+        self.save_freq = save_freq
 
         self.canvas = self.plotwidget.canvas
         self.figure = self.canvas.figure
         self.axes = None
-        self.ylabel = ylabel
-        self.units_label = units_label
-        self.save_path = save_path
-        self.conv_func = conv_func
-        if self.save_path is None:
-            self.save_path = self.loader.log_drive
         self.plot_worker = PlotWorker(self)
 
         self.data_fields = self.loader.get_header()[2:]
         self.n_data_fields = len(self.data_fields)
         if self.n_data_fields == 1:
             self.multi_plot_radioButton.setEnabled(False)
+        self.data = pd.DataFrame()
 
-        self.autoscale = None
-        self.outlier_reject = None
-        self.yscale = yscale
-        if self.yscale == 'lin':
+        if self.yscale == 'linear':
             self.lin_radioButton.setChecked(True)
         elif self.yscale == 'log':
             self.log_radioButton.setChecked(True)
-        else:
-            raise ValueError(f'Unexpected input string for yscale: {self.yscale}')
+        if self.plot_mode == 'singleplot':
+            self.single_plot_radioButton.setChecked(True)
+        elif self.plot_mode == 'multiplot':
+            self.multi_plot_radioButton.setChecked(True)
+
+        self.autoscale = None
+        self.outlier_reject = None
         self.ymin = None
         self.ymax = None
         self.refresh_time = 30
@@ -70,20 +77,13 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.history_minutes = None
         self.history_delta = None
         self.outlier_reject_level = 2
-        self.plot_mode = plot_mode
-        if self.plot_mode == 'singleplot':
-            self.single_plot_radioButton.setChecked(True)
-        elif self.plot_mode == 'multiplot':
-            self.multi_plot_radioButton.setChecked(True)
-        else:
-            raise ValueError(f'Unexpected input string for plot_mode: {self.plot_mode}')
 
-        self.data = pd.DataFrame()
         self.paused = False
         self.pause_pushButton.clicked.connect(self.pause_resume_clicked)
         self.settings_pushButton.clicked.connect(self.update_settings)
         self.tracking = True
         self.updating = False
+
         self.refresh_timer = QtCore.QTimer(self)
         self.refresh_timer.timeout.connect(self.update)
         self.update_signal.connect(self.plot_worker.run_update)
@@ -98,7 +98,7 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
 
         self.save_timer = QtCore.QTimer(self)
         self.save_timer.timeout.connect(self.plot_worker.save)
-        self.save_timer.start(int(10e3))
+        self.save_timer.start(self.save_freq)
 
     def configure_axes(self):
         self.figure.clear()
@@ -117,10 +117,9 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
     def configure_multiplot_axes(self):
         ax = self.figure.add_subplot(self.n_data_fields, 1, 1)
         axes = [ax]
-        if self.n_data_fields > 1:
-            for n in range(2, self.n_data_fields + 1):
-                ax = self.figure.add_subplot(self.n_data_fields, 1, n, sharex=axes[0])
-                axes.append(ax)
+        for n in range(2, self.n_data_fields + 1):
+            ax = self.figure.add_subplot(self.n_data_fields, 1, n, sharex=axes[0])
+            axes.append(ax)
         return axes
 
     def plot(self):
@@ -147,8 +146,8 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.axis_scalings()
         ax.set_ylabel(f'{self.ylabel} {self.units_label}')
         ax.set_xlabel('Time')
-        box = ax.get_position()
-        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        # box = ax.get_position()
+        # ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
         ax.legend(loc='lower left')
 
     def multi_plot(self):
@@ -199,12 +198,14 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         The mechanism avoids generating a backlog of update requests in the working thread
         if there are delays in that thread.
         """
-        if self.updating:
+        if not self.updating:
+            self.update_signal.emit()
+        elif self.updating:
             curr_time = datetime.datetime.now()
             time_str = curr_time.strftime('%H:%M:%S')
-            print(f'{time_str} Plot is currently updating. Cannot update until previous update is complete.')
+            print(f'{time_str} - {self.loader.file_prefix} plotter - Plot is currently updating. '
+                  f'Cannot update until previous update is complete.')
             return
-        self.update_signal.emit()
 
     def update_settings(self):
         self.pause()
@@ -213,7 +214,6 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         if self.xscale_tabWidget.currentIndex() == 0:
             self.set_xrange_history_mode()
         elif self.xscale_tabWidget.currentIndex() == 1:
-            self.turn_off_tracking()
             self.set_xrange_range_mode()
         if self.single_plot_radioButton.isChecked():
             self.plot_mode = 'singleplot'
@@ -224,24 +224,25 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
         self.resume()
 
     def update_yaxis_settings(self):
-        self.autoscale = self.autoscale_checkBox.isChecked()
         self.outlier_reject = self.outlier_checkBox.isChecked()
         try:
             self.outlier_reject_level = round(abs(float(self.outlier_reject_level_lineEdit.text())), 2)
-            self.outlier_reject_level_lineEdit.setText(f'{self.outlier_reject_level:.2f}')
         except ValueError:
             print('invalid input for outlier reject level, input must be real number')
-        if self.lin_radioButton.isChecked():
-            self.yscale = 'linear'
-        elif self.log_radioButton.isChecked():
-            self.yscale = 'log'
+        self.outlier_reject_level_lineEdit.setText(f'{self.outlier_reject_level:.2f}')
+
+        self.autoscale = self.autoscale_checkBox.isChecked()
         try:
             self.ymin = float(self.ymin_lineEdit.text())
             self.ymax = float(self.ymax_lineEdit.text())
         except ValueError:
             print('invalid input for y limits, input must be real number')
-        self.ymin_lineEdit.setText(str(self.ymin))
-        self.ymax_lineEdit.setText(str(self.ymax))
+        self.ymin_lineEdit.setText(f'{self.ymin:.2f}')
+        self.ymax_lineEdit.setText(f'{self.ymax:.2f}')
+        if self.lin_radioButton.isChecked():
+            self.yscale = 'linear'
+        elif self.log_radioButton.isChecked():
+            self.yscale = 'log'
 
     def update_refresh_settings(self):
         try:
@@ -251,7 +252,7 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
                 self.refresh_timer.start(self.refresh_time)
         except ValueError:
             print('invalid input for refresh time, input must be real number')
-        self.refresh_lineEdit.setText(f'{self.refresh_time*1e-3:.3f}')
+        self.refresh_lineEdit.setText(f'{self.refresh_time*1e-3:.1f}')
 
     def set_xrange_history_mode(self):
         history_stopdate_text = self.history_stopdate_lineEdit.text()
@@ -270,15 +271,16 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
             self.history_minutes = int(self.minutes_lineEdit.text())
         except ValueError:
             print('invalid input for plot history, all inputs must be integers')
-        self.days_lineEdit.setText(str(self.history_days))
-        self.hours_lineEdit.setText(str(self.history_hours))
-        self.minutes_lineEdit.setText(str(self.history_minutes))
+        self.days_lineEdit.setText(f'{self.history_days}')
+        self.hours_lineEdit.setText(f'{self.history_hours}')
+        self.minutes_lineEdit.setText(f'{self.history_minutes}')
         self.history_delta = datetime.timedelta(days=self.history_days,
                                                 hours=self.history_hours,
                                                 minutes=self.history_minutes)
         self.start_datetime = self.stop_datetime - self.history_delta
 
     def set_xrange_range_mode(self):
+        self.turn_off_tracking()
         startdate_text = self.range_startdate_lineEdit.text()
         stopdate_text = self.range_stopdate_lineEdit.text()
         try:
@@ -308,11 +310,13 @@ class PlotWindow(Ui_PlotWindow, QtWidgets.QMainWindow):
 
     def pause(self):
         self.refresh_timer.stop()
+        self.save_timer.stop()
         self.pause_pushButton.setText('Resume')
         self.paused = True
 
     def resume(self):
         self.refresh_timer.start(self.refresh_time)
+        self.save_timer.start()
         self.pause_pushButton.setText('Pause')
         self.paused = False
 
@@ -347,8 +351,8 @@ class IonPumpPlotWindow(PlotWindow):
         self.axis_scalings()
         ax.set_ylabel(f'{self.ylabel} {self.units_label}')
         ax.set_xlabel('Time')
-        box = ax.get_position()
-        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        # box = ax.get_position()
+        # ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
         ax.legend(loc='lower left')
 
         ax2 = self.axes[1]
