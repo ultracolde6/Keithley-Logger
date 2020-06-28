@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     save_groups = [mag_group, ion_pump_group, ion_gauge_group]
 
-    keithley_device = logger.Keithley(port=keithley_port, timeout=15, quiet=False)
+    keithley_device = logger.Keithley(port=keithley_port, timeout=15, quiet=True)
     controller = logger.Logger(save_groups=save_groups, device=keithley_device, log_freq=t_read_freq, quiet=False)
 
     plotters = [mag_plotter, ion_pump_plotter, ion_gauge_plotter]
