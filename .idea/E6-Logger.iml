@@ -5,6 +5,7 @@
       <sourceFolder url="file://$MODULE_DIR$" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/gui" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/Old Logger" />
+      <excludeFolder url="file://$MODULE_DIR$/testing" />
       <excludeFolder url="file://$MODULE_DIR$/ui" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.7" jdkType="Python SDK" />
