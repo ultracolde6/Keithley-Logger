@@ -30,9 +30,12 @@ class Logger(QtCore.QObject):
 
     def log_data(self):
         curr_datetime, data = self.read_data()
+        data_str = ''
         for chan in self.channels:
             chan.curr_data = chan.conv_func(data[chan.chan_idx])  # Consider saving raw data instead of converted data
-            print(f'[{chan.chan_name}: {chan.curr_data:.3f}] ')
+            data_str += f'[{chan.chan_name}: {chan.curr_data:.3f}] '
+        if not self.quiet:
+            print(data_str)
         for save_group in self.save_groups:
             save_group.save_data(curr_datetime)
 
