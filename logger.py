@@ -24,11 +24,9 @@ class Logger(QtCore.QObject):
 
         self.quiet = quiet
 
-        self.log_data()  # Log data immediately before starting timer
         self.log_freq = log_freq
         self.data_timer = QtCore.QTimer(self)
         self.data_timer.timeout.connect(self.log_data)
-        self.data_timer.start(self.log_freq*1e3)
 
     def log_data(self):
         curr_datetime, data = self.read_data()
@@ -50,6 +48,10 @@ class Logger(QtCore.QObject):
             else:
                 print(date_time_string + f": Error: Received {data} from Keithley")
         return curr_datetime, data
+
+    def start_logging(self):
+        self.log_data()  # Log data immediately before starting timer
+        self.data_timer.start(self.log_freq*1e3)
 
 
 class Keithley:
