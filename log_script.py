@@ -54,8 +54,16 @@ if __name__ == '__main__':
                                       error_drive=error_drive,
                                       webplot_drive=webplot_drive)
     ion_pump_loader = ion_pump_group.make_loader()
-    ion_pump_plotter = IonPumpPlotWindow(ion_pump_loader, save_path=webplot_drive, conv_func=(lambda x: 10**x*1e9),
-                                         ylabel='Ion Pump Current', units_label='(nA)')
+
+    def curr2press(curr):
+        # formula given in ion pump controller to convert current (expressed in nA) to pressure (in torr)
+        return 0.066 * curr * 10 ** -9 * 5600 / 7000 / 70
+
+    ion_pump_plotter = PlotWindow(ion_pump_loader, save_path=webplot_drive, conv_func=(lambda x: 10**x*1e9),
+                                  ylabel='Ion Pump Current', units_label='(nA)',
+                                  twinx_on=True, twinx_func=curr2press, twinx_label='Pressure (torr)')
+    # ion_pump_plotter = IonPumpPlotWindow(ion_pump_loader, save_path=webplot_drive, conv_func=(lambda x: 10**x*1e9),
+    #                                      ylabel='Ion Pump Current', units_label='(nA)')
 
     # Omega temperature converters readout 1 degree per mV.
     # temp_exp_cloud = kmm_data_handler.Channel(hard_port=108, chan_name='Temp_exp_cloud', conv_func=lambda v: 1000 * v)

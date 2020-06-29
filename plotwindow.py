@@ -30,10 +30,10 @@ class PlotWindow(Ui_PlotWindow, QMainWindow):
     reconfigure_plot_signal = pyqtSignal()
 
     def __init__(self, loader, ylabel='Signal Level', units_label='(a.u.)', save_path=None, conv_func=(lambda x: x),
-                 plot_mode='singleplot', yscale='linear', save_freq=int(10e3)):
+                 plot_mode='singleplot', yscale='linear', save_freq=int(10e3),
+                 twinx_on=False, twinx_func=(lambda x: x), twinx_label='Signal Level'):
         super(PlotWindow, self).__init__()
         self.setupUi(self)
-
         self.loader = loader
         self.ylabel = ylabel
         self.units_label = units_label
@@ -44,10 +44,14 @@ class PlotWindow(Ui_PlotWindow, QMainWindow):
         self.plot_mode = plot_mode
         self.yscale = yscale
         self.save_freq = save_freq
+        self.twinx_on = twinx_on
+        self.twinx_func = twinx_func
+        self.twinx_label = twinx_label
 
         self.canvas = self.plotwidget.canvas
         self.figure = self.canvas.figure
         self.axes = None
+        self.twin_axes = None
         self.plot_worker = PlotWorker(self)
 
         self.data_fields = self.loader.get_header()[2:]
@@ -103,25 +107,32 @@ class PlotWindow(Ui_PlotWindow, QMainWindow):
 
     def configure_axes(self):
         self.figure.clear()
-        axes = []
+        self.axes = []
+        self.twin_axes = []
         if self.plot_mode == 'singleplot':
-            axes = self.configure_singleplot_axes()
+            self.configure_singleplot_axes()
         elif self.plot_mode == 'multiplot':
-            axes = self.configure_multiplot_axes()
-        self.axes = axes
+            self.configure_multiplot_axes()
 
     def configure_singleplot_axes(self):
         ax = self.figure.add_subplot(1, 1, 1)
-        axes = [ax]
-        return axes
+        self.axes = [ax]
+        if self.twinx_on:
+            twin_ax = ax.twinx()
+            self.twin_axes = [twin_ax]
 
     def configure_multiplot_axes(self):
         ax = self.figure.add_subplot(self.n_data_fields, 1, 1)
-        axes = [ax]
+        self.axes = [ax]
+        if self.twinx_on:
+            twin_ax = ax.twinx()
+            self.twin_axes.append(twin_ax)
         for n in range(2, self.n_data_fields + 1):
-            ax = self.figure.add_subplot(self.n_data_fields, 1, n, sharex=axes[0])
-            axes.append(ax)
-        return axes
+            ax = self.figure.add_subplot(self.n_data_fields, 1, n, sharex=self.axes[0])
+            self.axes.append(ax)
+            if self.twinx_on:
+                twin_ax = ax.twinx()
+                self.twin_axes.append(twin_ax)
 
     def plot(self):
         self.updating = True
@@ -184,11 +195,16 @@ class PlotWindow(Ui_PlotWindow, QMainWindow):
             self.data = self.loader.grab_dates(self.start_datetime.date(), self.stop_datetime.date())
 
     def axis_scalings(self):
-        for ax in self.axes:
+        for idx, ax in enumerate(self.axes):
             if not self.autoscale:
                 ax.set_ylim(self.ymin, self.ymax)
             ax.set_yscale(self.yscale)
             ax.set_xlim(self.start_datetime, self.stop_datetime)
+            if self.twinx_on:
+                twin_ax = self.twin_axes[idx]
+                ymin, ymax = ax.get_ylim()
+                twin_ax.set_ylim(self.twinx_func(ymin), self.twinx_func(ymax))
+                twin_ax.set_ylabel(self.twinx_label)
 
     def update(self):
         """
