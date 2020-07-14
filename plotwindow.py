@@ -2,33 +2,12 @@ import numpy as np
 import datetime
 from pathlib import Path
 import pandas as pd
-from PyQt5.QtCore import QObject, pyqtSignal, QTimer, QThread
+from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QMainWindow
 from ui_plotwindow import Ui_PlotWindow
 
 
-# class PlotWorker(QObject):
-#     def __init__(self, plot_window):
-#         super(PlotWorker, self).__init__()
-#         self.plot_window = plot_window
-#         self.work_thread = QThread()
-#         self.work_thread.start()
-#         self.moveToThread(self.work_thread)
-#
-#     def run_update(self):
-#         self.plot_window.plot()
-#
-#     def run_configure_axes(self):
-#         self.plot_window.configure_axes()
-#
-#     def save(self):
-#         self.plot_window.save_plot()
-
-
 class PlotWindow(Ui_PlotWindow, QMainWindow):
-    # update_signal = pyqtSignal()
-    # reconfigure_plot_signal = pyqtSignal()
-
     def __init__(self, loader, ylabel='Signal Level', units_label='(a.u.)', save_path=None, conv_func=(lambda x: x),
                  plot_mode='singleplot', yscale='linear', save_freq=int(10e3),
                  twinx_on=False, twinx_func=(lambda x: x), twinx_label='Signal Level'):
@@ -52,7 +31,6 @@ class PlotWindow(Ui_PlotWindow, QMainWindow):
         self.figure = self.canvas.figure
         self.axes = None
         self.twin_axes = None
-        # self.plot_worker = PlotWorker(self)
 
         self.data_fields = self.loader.get_header()[2:]
         self.n_data_fields = len(self.data_fields)
@@ -83,33 +61,23 @@ class PlotWindow(Ui_PlotWindow, QMainWindow):
         self.outlier_reject_level = 2
 
         self.paused = False
+        self.tracking = True
         self.pause_pushButton.clicked.connect(self.pause_resume_clicked)
         self.settings_pushButton.clicked.connect(self.update_settings)
-        self.tracking = True
-        self.updating = False
 
         self.refresh_timer = QTimer(self)
-        # self.refresh_timer.timeout.connect(self.update)
         self.refresh_timer.timeout.connect(self.plot)
-        # self.update_signal.connect(self.plot_worker.run_update)
-        # self.update_signal.connect(self.plot)
-        # self.update_pushButton.clicked.connect(self.update)
         self.update_pushButton.clicked.connect(self.plot)
-        # self.reconfigure_plot_signal.connect(self.plot_worker.run_configure_axes)
-        # self.reconfigure_plot_signal.connect(self.configure_axes)
 
         self.save_timer = QTimer(self)
-        # self.save_timer.timeout.connect(self.plot_worker.save)
         self.save_timer.timeout.connect(self.save_plot)
-        self.save_timer.start(self.save_freq)
 
-        # self.reconfigure_plot_signal.emit()
         self.configure_axes()
         self.update_settings()
-        self.update()
         self.setWindowTitle(f'{self.loader.file_prefix} Plotter')
         self.show()
         self.refresh_timer.start(self.refresh_time)
+        self.save_timer.start(self.save_freq)
 
     def configure_axes(self):
         self.figure.clear()
@@ -141,7 +109,6 @@ class PlotWindow(Ui_PlotWindow, QMainWindow):
                 self.twin_axes.append(twin_ax)
 
     def plot(self):
-        self.updating = True
         self.load()
         if self.plot_mode == 'singleplot':
             self.single_plot()
@@ -149,7 +116,6 @@ class PlotWindow(Ui_PlotWindow, QMainWindow):
             self.multi_plot()
         self.figure.set_tight_layout(True)
         self.canvas.draw()
-        self.updating = False
 
     def single_plot(self):
         plot_data = self.data[self.data_fields]
@@ -212,22 +178,6 @@ class PlotWindow(Ui_PlotWindow, QMainWindow):
                 twin_ax.set_ylim(self.twinx_func(ymin), self.twinx_func(ymax))
                 twin_ax.set_ylabel(self.twinx_label)
 
-    # def update(self):
-    #     """
-    #     The PlotWindow thread initiates the update process by first checking
-    #     if the update process is already occurring. If so it aborts, otherwise it continues.
-    #     The mechanism avoids generating a backlog of update requests in the working thread
-    #     if there are delays in that thread.
-    #     """
-    #     if not self.updating:
-    #         self.update_signal.emit()
-    #     elif self.updating:
-    #         curr_time = datetime.datetime.now()
-    #         time_str = curr_time.strftime('%H:%M:%S')
-    #         print(f'{time_str} - {self.loader.file_prefix} plotter - Plot is currently updating. '
-    #               f'Cannot update until previous update is complete.')
-    #         return
-
     def update_settings(self):
         """
         Main configuration method for plot functionality. Runs at initialization of Plotter and whenever
@@ -247,9 +197,7 @@ class PlotWindow(Ui_PlotWindow, QMainWindow):
             self.plot_mode = 'singleplot'
         elif self.multi_plot_radioButton.isChecked():
             self.plot_mode = 'multiplot'
-        # self.reconfigure_plot_signal.emit()
         self.configure_axes()
-        # self.update()
         self.plot()
         self.resume()
 
