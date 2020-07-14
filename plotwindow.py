@@ -92,7 +92,8 @@ class PlotWindow(Ui_PlotWindow, QMainWindow):
         self.refresh_timer.timeout.connect(self.update)
         self.update_signal.connect(self.plot_worker.run_update)
         self.update_pushButton.clicked.connect(self.update)
-        self.reconfigure_plot_signal.connect(self.plot_worker.run_configure_axes)
+        # self.reconfigure_plot_signal.connect(self.plot_worker.run_configure_axes)
+        self.reconfigure_plot_signal.connect(self.configure_axes)
 
         self.save_timer = QTimer(self)
         self.save_timer.timeout.connect(self.plot_worker.save)
