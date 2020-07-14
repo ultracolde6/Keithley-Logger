@@ -7,22 +7,22 @@ from PyQt5.QtWidgets import QMainWindow
 from ui_plotwindow import Ui_PlotWindow
 
 
-class PlotWorker(QObject):
-    def __init__(self, plot_window):
-        super(PlotWorker, self).__init__()
-        self.plot_window = plot_window
-        self.work_thread = QThread()
-        self.work_thread.start()
-        self.moveToThread(self.work_thread)
-
-    def run_update(self):
-        self.plot_window.plot()
-
-    def run_configure_axes(self):
-        self.plot_window.configure_axes()
-
-    def save(self):
-        self.plot_window.save_plot()
+# class PlotWorker(QObject):
+#     def __init__(self, plot_window):
+#         super(PlotWorker, self).__init__()
+#         self.plot_window = plot_window
+#         self.work_thread = QThread()
+#         self.work_thread.start()
+#         self.moveToThread(self.work_thread)
+#
+#     def run_update(self):
+#         self.plot_window.plot()
+#
+#     def run_configure_axes(self):
+#         self.plot_window.configure_axes()
+#
+#     def save(self):
+#         self.plot_window.save_plot()
 
 
 class PlotWindow(Ui_PlotWindow, QMainWindow):
@@ -52,7 +52,7 @@ class PlotWindow(Ui_PlotWindow, QMainWindow):
         self.figure = self.canvas.figure
         self.axes = None
         self.twin_axes = None
-        self.plot_worker = PlotWorker(self)
+        # self.plot_worker = PlotWorker(self)
 
         self.data_fields = self.loader.get_header()[2:]
         self.n_data_fields = len(self.data_fields)
@@ -97,7 +97,8 @@ class PlotWindow(Ui_PlotWindow, QMainWindow):
         self.reconfigure_plot_signal.connect(self.configure_axes)
 
         self.save_timer = QTimer(self)
-        self.save_timer.timeout.connect(self.plot_worker.save)
+        # self.save_timer.timeout.connect(self.plot_worker.save)
+        self.save_timer.timeout.connect(self.save_plot())
         self.save_timer.start(self.save_freq)
 
         self.reconfigure_plot_signal.emit()
