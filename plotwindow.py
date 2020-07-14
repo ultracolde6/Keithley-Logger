@@ -98,7 +98,7 @@ class PlotWindow(Ui_PlotWindow, QMainWindow):
 
         self.save_timer = QTimer(self)
         # self.save_timer.timeout.connect(self.plot_worker.save)
-        self.save_timer.timeout.connect(self.save_plot())
+        self.save_timer.timeout.connect(self.save_plot)
         self.save_timer.start(self.save_freq)
 
         self.reconfigure_plot_signal.emit()
