@@ -110,10 +110,13 @@ class PlotWindow(Ui_PlotWindow, QMainWindow):
 
     def plot(self):
         self.load()
-        if self.plot_mode == 'singleplot':
-            self.single_plot()
-        elif self.plot_mode == 'multiplot':
-            self.multi_plot()
+        try:
+            if self.plot_mode == 'singleplot':
+                self.single_plot()
+            elif self.plot_mode == 'multiplot':
+                self.multi_plot()
+        except KeyError:
+            print('Error plotting, there may be no data to load.')
         self.figure.set_tight_layout(True)
         self.canvas.draw()
 
