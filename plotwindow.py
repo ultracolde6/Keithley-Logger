@@ -266,7 +266,8 @@ class PlotWindow(Ui_PlotWindow, QMainWindow):
         stopdate_text = self.range_stopdate_lineEdit.text()
         try:
             self.start_datetime = datetime.datetime.strptime(startdate_text, '%y/%m/%d %H:%M:%S')
-            self.stop_datetime = datetime.datetime.strptime(stopdate_text, '%y/%m/%d %H:%M:%S')
+            if stopdate_text.lower() != 'now':
+                self.stop_datetime = datetime.datetime.strptime(stopdate_text, '%y/%m/%d %H:%M:%S')
         except ValueError:
             print('invalid input for start or stop date, input must be formatted as YY/MM/DD HH:MM:SS')
 

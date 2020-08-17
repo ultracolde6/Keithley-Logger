@@ -137,6 +137,13 @@ class Keithley:
                 f"SENS:TEMP:NPLC 5,(@{hard_port})"]
 
     @staticmethod
+    def thrmstr_cmds(hard_port):
+        return [f"SENS:FUNC 'TEMP',(@{hard_port})",
+                f"SENS:TEMP:TRAN THER,(@{hard_port})",
+                f"SENS:TEMP:THER:TYPE 10000,(@{hard_port})",
+                f"SENS:TEMP:NPLC 5,(@{hard_port})"]
+
+    @staticmethod
     def thcpl_cmds(hard_port):
         return [f"SENS:FUNC 'TEMP',(@{hard_port})",
                 f"SENS:TEMP:TRAN TC,(@{hard_port})",

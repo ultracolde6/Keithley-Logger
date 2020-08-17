@@ -67,11 +67,15 @@ def setup_ion_pump_group(log_drive, backup_drive, error_drive, webplot_drive):
 
 def setup_temperature_group(log_drive, backup_drive, error_drive, webplot_drive):
     # Omega temperature converters readout 1 degree per mV.
-    temp_exp_cloud = logger.Channel(hard_port=108, chan_name='Temp_exp_cloud', conv_func=lambda v: 1000 * v)
-    temp_exp_table = logger.Channel(hard_port=110, chan_name='Temp_exp_table', conv_func=lambda v: 1000 * v)
-    temp_group = logger.SaveGroup([temp_exp_cloud, temp_exp_table], group_name='Temp', quiet=True,
-                                  log_drive=Path(log_drive, 'Temp'),
-                                  backup_drive=Path(backup_drive, 'Temp'),
+    temp_exp_cloud = logger.Channel(hard_port=108, chan_name='Temp_exp_cloud', conv_func=lambda t: t,
+                                    init_cmds_template=logger.Keithley.thrmstr_cmds)
+    temp_exp_table = logger.Channel(hard_port=111, chan_name='Temp_exp_table', conv_func=lambda t: t,
+                                    init_cmds_template=logger.Keithley.thrmstr_cmds)
+    temp_laser_table = logger.Channel(hard_port=113, chan_name='Temp_laser_table', conv_func=lambda t: t,
+                                    init_cmds_template=logger.Keithley.thrmstr_cmds)
+    temp_group = logger.SaveGroup([temp_exp_cloud, temp_exp_table, temp_laser_table], group_name='LabTemp', quiet=True,
+                                  log_drive=Path(log_drive, 'LabTemp'),
+                                  backup_drive=Path(backup_drive, 'LabTemp'),
                                   error_drive=error_drive,
                                   webplot_drive=webplot_drive)
     temp_loader = temp_group.make_loader()
@@ -93,13 +97,14 @@ def main():
     mag_group, mag_plotter = setup_mag_group(log_drive, backup_drive, error_drive, webplot_drive)
     ion_gauge_group, ion_gauge_plotter = setup_ion_gauge_group(log_drive, backup_drive, error_drive, webplot_drive)
     ion_pump_group, ion_pump_plotter = setup_ion_pump_group(log_drive, backup_drive, error_drive, webplot_drive)
+    temperature_group, temperature_plotter = setup_temperature_group(log_drive, backup_drive, error_drive, webplot_drive)
 
     keithley_device = logger.Keithley(port=keithley_port, timeout=15, quiet=True)
-    save_groups = [mag_group, ion_pump_group, ion_gauge_group]
+    save_groups = [mag_group, ion_pump_group, ion_gauge_group, temperature_group]
     keithley_logger = logger.Logger(save_groups=save_groups, device=keithley_device, log_freq=t_read_freq, quiet=False)
     keithley_logger.start_logging()
 
-    plotters = [mag_plotter, ion_pump_plotter, ion_gauge_plotter]
+    plotters = [mag_plotter, ion_pump_plotter, ion_gauge_plotter, temperature_plotter]
     plotter_manager = PlotterManagerWindow(plotters)
     plotter_manager.show()
 
