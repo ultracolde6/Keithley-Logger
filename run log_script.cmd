@@ -1,0 +1,1 @@
+python log_script.py
